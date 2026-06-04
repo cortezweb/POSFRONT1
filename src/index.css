@@ -1,0 +1,284 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+@import "./print.css";
+
+@theme {
+  --font-serif: "Montserrat", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --color-pizza-red: #ff5722; /* Sunset Orange */
+  --color-pizza-gold: #b02f00; /* Primary orange/accent */
+  --color-pizza-charcoal: #f9f9f9; /* Soft Cream (canvas) */
+  --color-pizza-dark: #212121; /* Deep Charcoal */
+}
+
+/* Reglas Globales */
+html, body {
+  background-color: var(--color-pizza-charcoal);
+  color: #1a1c1c; /* Deep Charcoal */
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Personalizar Barra de Desplazamiento */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-pizza-charcoal);
+}
+::-webkit-scrollbar-thumb {
+  background: #dadada;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-pizza-red);
+}
+
+/* Clases de utilidad personalizadas */
+.font-pizza-title {
+  font-family: var(--font-serif);
+}
+
+/* Efectos de Glassmorfismo */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 15px -3px rgba(33, 33, 33, 0.05), 0 4px 6px -4px rgba(33, 33, 33, 0.05) !important;
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Animaciones */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s infinite ease-in-out;
+}
+
+/* Sobrescribir el estilo de root de vite template */
+#root {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  border: none !important;
+  min-height: 100vh !important;
+  display: block !important;
+  text-align: left !important;
+}
+
+/* Ocultar en la pantalla normal las secciones de impresión */
+#print-ticket-container {
+  display: none;
+}
+
+@media print {
+  /* Al imprimir, forzar que solo se muestre el ticket */
+  #root {
+    display: none !important;
+  }
+  #print-ticket-container {
+    display: block !important;
+  }
+}
+
+/* Animación para el marcador de GPS (punto rojo pulsante) */
+@keyframes pulse-marker {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* ========================================================
+   SOBRESCRITURAS INTELIGENTES PARA EL MODO CLARO (DIGITAL CULINARY SYSTEM)
+   ======================================================== */
+
+/* 1. Mapeo de Fondos Oscuros Hardcodeados a Fondos Claros */
+.bg-\[\#181818\],
+.bg-\[\#181818\]\/60,
+.bg-\[\#181818\]\/40,
+.bg-\[\#141414\],
+.bg-\[\#141414\]\/90,
+.bg-\[\#161616\],
+.bg-\[\#101010\],
+.bg-\[\#101010\]\/80,
+.bg-\[\#121212\],
+.bg-pizza-dark\/80,
+.bg-pizza-dark\/60 {
+  background-color: #ffffff !important;
+  border-color: #e8e8e8 !important;
+  color: #1a1c1c !important;
+}
+
+/* 2. Sombra de Nivel 1 (Cards / Sheets) - 4px blur, 5% shadow */
+.bg-\[\#181818\],
+.bg-\[\#141414\],
+.bg-\[\#161616\] {
+  box-shadow: 0 4px 6px -1px rgba(33, 33, 33, 0.05), 0 2px 4px -1px rgba(33, 33, 33, 0.03) !important;
+  border: 1px solid #eeeeee !important;
+}
+
+/* 3. Sombra de Nivel 2 (Active/Floating/Modals) - 16px blur, 10% shadow */
+.glass-panel,
+.w-full.max-w-md.bg-\[\#181818\].border,
+.w-full.md\:w-\[420px\].bg-\[\#101010\],
+.w-full.max-w-md.bg-\[\#181818\] {
+  box-shadow: 0 10px 25px -5px rgba(33, 33, 33, 0.08), 0 8px 10px -6px rgba(33, 33, 33, 0.08) !important;
+  border: 1px solid #e2e2e2 !important;
+}
+
+/* 4. Inputs y Textareas en modo claro */
+input.bg-\[\#181818\],
+input.bg-pizza-dark\/80,
+input.bg-\[\#101010\],
+textarea.bg-\[\#181818\],
+select.bg-\[\#181818\] {
+  background-color: #ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+  color: #1a1c1c !important;
+  border-radius: 0.5rem !important; /* sm rounded 8px */
+}
+input.bg-\[\#181818\]:focus,
+input.bg-pizza-dark\/80:focus,
+input.bg-\[\#101010\]:focus,
+textarea.bg-\[\#181818\]:focus,
+select.bg-\[\#181818\]:focus {
+  border-color: #212121 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px #212121 !important;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #909191 !important;
+}
+
+/* 5. Mapeo de Colores de Texto */
+/* Sobrescribir clases de texto blanco a texto oscuro cuando no estén en contenedores oscuros */
+.text-white:not(button):not(a):not(.bg-pizza-red *):not(.bg-pizza-red):not(.bg-pizza-gold *):not(.bg-pizza-gold):not(.status-badge-ready *):not(.status-badge-ready):not(.bg-emerald-500 *):not(aside *):not(header *):not(.keep-white) {
+  color: #1a1c1c !important;
+}
+.text-white\/80:not(aside *):not(header *):not(button *),
+.text-white\/70:not(aside *):not(header *):not(button *),
+.text-white\/60:not(aside *):not(header *):not(button *),
+.text-white\/50:not(aside *):not(header *):not(button *),
+.text-gray-300:not(aside *):not(header *),
+.text-gray-400:not(aside *):not(header *) {
+  color: #5f5e5e !important;
+}
+.text-white\/40:not(aside *):not(header *),
+.text-white\/30:not(aside *):not(header *),
+.text-white\/20:not(aside *):not(header *),
+.text-white\/35:not(aside *):not(header *) {
+  color: #909191 !important;
+}
+
+/* 6. Mapeo de Acento de Pizza Gold a Sunset/Primary Orange */
+.text-\[\#ffd79b\],
+.text-\[\#ffd79b\]\/80 {
+  color: #b02f00 !important;
+}
+
+/* 7. Preservar Contenedores Oscuros (Sidebars y Headers que especifica el Diseño) */
+aside.bg-pizza-dark,
+.aside-dark-override {
+  background-color: #212121 !important; /* Deep Charcoal */
+  color: #ffffff !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+aside.bg-pizza-dark *,
+.aside-dark-override * {
+  color: #ffffff !important;
+}
+aside.bg-pizza-dark .text-white\/50,
+aside.bg-pizza-dark .text-white\/40,
+aside.bg-pizza-dark .text-white\/30,
+.aside-dark-override .text-white\/50 {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+/* Asegurar que el botón activo del menú sidebar mantenga su color naranja y texto blanco */
+aside.bg-pizza-dark button.bg-pizza-red *,
+.aside-dark-override button.bg-pizza-red * {
+  color: #ffffff !important;
+}
+
+/* 8. Botones e Iconos */
+/* Botones primarios (Sunset Orange) y secundarios (Deep Charcoal) */
+.bg-pizza-red {
+  background-color: #ff5722 !important;
+  color: #ffffff !important;
+}
+.bg-pizza-red:hover {
+  background-color: #e24d1f !important;
+}
+.bg-pizza-red\/10 {
+  background-color: rgba(255, 87, 34, 0.1) !important;
+  color: #ff5722 !important;
+  border-color: rgba(255, 87, 34, 0.2) !important;
+}
+.bg-pizza-red\/10:hover {
+  background-color: rgba(255, 87, 34, 0.18) !important;
+}
+
+/* Botones secundarios (Deep Charcoal) */
+.bg-secondary-button-override {
+  background-color: #212121 !important;
+  color: #ffffff !important;
+}
+.bg-secondary-button-override:hover {
+  background-color: #2f3131 !important;
+}
+
+/* Botones Ghost (border Deep Charcoal) */
+.border-pizza-dark {
+  border-color: #212121 !important;
+  color: #212121 !important;
+}
+
+/* 9. Sobrescribir colores de badges de estado en base a la especificación */
+/* Pending: Grey background, Deep Charcoal text. */
+.bg-\[\#ffd79b\]\/10.border-\[\#ffd79b\]\/20.text-\[\#ffd79b\],
+.status-pending {
+  background-color: #dadada !important;
+  color: #1a1c1c !important;
+  border-color: transparent !important;
+}
+/* In Progress: Deep Charcoal background, Cream text. */
+.bg-pizza-red\/10.border-pizza-red\/20.text-pizza-red,
+.status-progress {
+  background-color: #212121 !important;
+  color: #f9f9f9 !important;
+  border-color: transparent !important;
+}
+/* Ready: Sunset Orange background, White text. */
+.bg-emerald-500\/10.border-emerald-500\/20.text-emerald-400,
+.status-ready {
+  background-color: #ff5722 !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+/* 10. Divisores y Bordes Generales */
+.border-white\/5,
+.border-white\/10,
+.border-t-white\/5,
+.border-b-white\/5 {
+  border-color: #e8e8e8 !important;
+}
