@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useCart } from "../context/CartContext";
 import { db } from "../firebase/config";
 import { collection, getDocs, addDoc, serverTimestamp, query, where, orderBy, limit, onSnapshot, doc, updateDoc, increment } from "firebase/firestore";
-import { formatCurrency, formatWhatsAppMessage } from "../utils/formatters";
+import { formatCurrency, formatWhatsAppMessage, parseComboItem, getProductPriceWithExtras, getOptionPriceAdjustment } from "../utils/formatters";
 import { MapboxSearch } from "../components/MapboxSearch";
 import { 
   ShoppingBag, Trash2, Plus, Minus, X, 
@@ -19,6 +19,8 @@ export const ClientMenu = () => {
     customerPhone, setCustomerPhone, customerAddress, customerCoords,
     businessConfig, getTotals
   } = useCart();
+
+  const availableCoupons = Object.entries(businessConfig.discounts?.coupons || {});
 
   const [products, setProducts] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
@@ -37,6 +39,7 @@ export const ClientMenu = () => {
   const [activeMobileTab, setActiveMobileTab] = useState("home");
   const [infoDrawerOpen, setInfoDrawerOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
+  const [tablesList, setTablesList] = useState([]);
 
   // Estados para seguimiento de pedidos
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
@@ -129,9 +132,23 @@ export const ClientMenu = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const cats = [];
       snapshot.forEach((doc) => {
+        doc.data(); // evitamos warnings de unused variable si los hubiera
         cats.push({ id: doc.id, ...doc.data() });
       });
       setCategoriesList(cats);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Cargar mesas de Firestore en tiempo real
+  useEffect(() => {
+    const q = query(collection(db, "tables"), orderBy("name", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setTablesList(list);
     });
     return () => unsubscribe();
   }, []);
@@ -172,9 +189,17 @@ export const ClientMenu = () => {
     }
     setOptionsSelected(initialOpts);
 
-    // Inicializar selecciones de combos
+    // Inicializar selecciones de combos auto-seleccionando opciones e items fijos
     if (product.comboItems) {
-      setComboItemsSelected(Array(product.comboItems.length).fill(""));
+      const initialCombos = product.comboItems.map((itemText) => {
+        const parsed = parseComboItem(itemText);
+        if (parsed.isSelection) {
+          return parsed.options[0] ? `${parsed.name}: ${parsed.options[0]}` : parsed.name;
+        } else {
+          return parsed.name;
+        }
+      });
+      setComboItemsSelected(initialCombos);
     } else {
       setComboItemsSelected([]);
     }
@@ -366,7 +391,7 @@ export const ClientMenu = () => {
             
             <button
               onClick={() => setOrderSuccess(null)}
-              className="w-full bg-white/5 hover:bg-white/10 text-white py-3.5 px-6 rounded-2xl font-semibold text-sm transition-all border border-white/10 cursor-pointer"
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-3.5 px-6 rounded-2xl font-semibold text-sm transition-all border border-gray-200 cursor-pointer"
             >
               Volver al Menú
             </button>
@@ -437,25 +462,83 @@ export const ClientMenu = () => {
                 ¡Descuentos Progresivos en todo el Menú!
               </h2>
               <p className="text-xs text-white/60 max-w-lg">
-                Ahorra automáticamente mientras agregas más productos. Descuentos desde el 5% hasta el 15% por compras mayores a $50. Usa el cupón <strong className="text-pizza-gold">PIZZALOVE</strong> para un 20% adicional.
+                Ahorra automáticamente en tu total al agregar más productos. 
+                {couponCode ? (
+                  <> Tienes el cupón <strong className="text-pizza-gold">{couponCode}</strong> activado.</>
+                ) : (
+                  <> Usa un código de cupón disponible abajo para obtener descuentos adicionales.</>
+                )}
               </p>
             </div>
-            <div className="flex gap-2.5 shrink-0 bg-black/40 border border-white/5 rounded-2xl p-3 text-xs">
-              <div className="text-center px-2 border-r border-white/10">
-                <span className="block text-pizza-gold font-bold text-base">&gt; $50</span>
-                <span className="text-[10px] text-white/50">5% OFF</span>
+            {businessConfig.discounts?.autoDiscounts?.length > 0 && (
+              <div className="flex gap-2.5 shrink-0 bg-black/40 border border-white/5 rounded-2xl p-3 text-xs">
+                {(businessConfig.discounts.autoDiscounts).map((rule, idx, arr) => (
+                  <div 
+                    key={idx} 
+                    className={`text-center px-2.5 ${idx < arr.length - 1 ? "border-r border-white/10" : ""}`}
+                  >
+                    <span className="block text-pizza-gold font-bold text-sm">
+                      &gt; {formatCurrency(rule.minAmount, businessConfig.currency)}
+                    </span>
+                    <span className="text-[10px] text-white/50">{rule.discountPercent}% OFF</span>
+                  </div>
+                ))}
               </div>
-              <div className="text-center px-2 border-r border-white/10">
-                <span className="block text-pizza-gold font-bold text-base">&gt; $100</span>
-                <span className="text-[10px] text-white/50">10% OFF</span>
-              </div>
-              <div className="text-center px-2">
-                <span className="block text-pizza-gold font-bold text-base">&gt; $150</span>
-                <span className="text-[10px] text-white/50">15% OFF</span>
-              </div>
-            </div>
+            )}
           </div>
         </section>
+
+        {/* Sección de Cupones y Ofertas */}
+        {availableCoupons.length > 0 && (
+          <section className="px-6 py-4 space-y-4">
+            <h3 className="font-pizza-title text-base font-bold text-white flex items-center gap-1.5">
+              <Percent size={18} className="text-pizza-gold" />
+              Cupones Disponibles
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {availableCoupons.map(([code, discount]) => (
+                <div 
+                  key={code} 
+                  className="relative bg-gradient-to-r from-pizza-red/5 to-pizza-gold/5 border border-pizza-red/10 rounded-2xl p-4 flex items-center justify-between overflow-hidden shadow-sm hover:shadow-md transition-all group"
+                >
+                  {/* Perforaciones circulares de ticket */}
+                  <div className="absolute top-1/2 -translate-y-1/2 -left-3 w-6 h-6 rounded-full bg-pizza-charcoal border-r border-pizza-red/10 z-10"></div>
+                  <div className="absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-6 rounded-full bg-pizza-charcoal border-l border-pizza-red/10 z-10"></div>
+                  
+                  {/* Línea divisoria punteada */}
+                  <div className="absolute top-0 bottom-0 left-[72%] border-l-2 border-dashed border-pizza-red/10"></div>
+
+                  <div className="flex-1 pr-6 flex items-center gap-3 text-left">
+                    <div className="w-10 h-10 rounded-xl bg-pizza-red/10 flex items-center justify-center text-pizza-red shrink-0">
+                      <Tag size={18} />
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-pizza-red font-black uppercase tracking-wider block">CUPÓN EXCLUSIVO</span>
+                      <h4 className="text-sm font-extrabold text-white">{code}</h4>
+                      <p className="text-[10px] text-white/50">{discount}% de descuento en tu total</p>
+                    </div>
+                  </div>
+
+                  <div className="pl-4 shrink-0 flex flex-col items-center justify-center min-w-[80px]">
+                    {couponCode === code ? (
+                      <span className="text-[9px] bg-green-500/10 border border-green-500/35 text-green-600 font-bold px-2 py-1 rounded-lg flex items-center gap-1 select-none">
+                        <Check size={10} />
+                        Aplicado
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => applyCoupon(code)}
+                        className="text-[9px] bg-pizza-red hover:bg-pizza-red/90 text-white font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer border-0"
+                      >
+                        Aplicar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Selector de Categorías */}
         <section className="px-6 py-4 overflow-x-auto flex gap-2 sticky top-[72px] z-30 bg-pizza-charcoal/95 backdrop-blur-md">
@@ -466,7 +549,7 @@ export const ClientMenu = () => {
               className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 border ${
                 activeCategory === cat.id
                   ? "bg-pizza-red border-pizza-red text-white shadow-lg shadow-pizza-red/20"
-                  : "bg-white/5 border-white/5 hover:bg-white/10 text-white/70"
+                  : "bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700"
               }`}
             >
               {cat.name}
@@ -582,7 +665,7 @@ export const ClientMenu = () => {
                       ) : (
                         <button
                           onClick={() => handleOpenCustomize(prod)}
-                          className="bg-[#ffd79b]/10 hover:bg-[#ffd79b]/25 border border-[#ffd79b]/20 text-[#ffd79b] hover:text-white px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer"
+                          className="bg-[#ffd79b]/10 hover:bg-pizza-red hover:border-pizza-red border border-[#ffd79b]/20 text-[#ffd79b] hover:text-white px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer"
                         >
                           Agregar
                         </button>
@@ -770,7 +853,7 @@ export const ClientMenu = () => {
                     className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider border shrink-0 transition-all cursor-pointer ${
                       activeCategory === cat.id
                         ? "bg-pizza-red border-pizza-red text-white shadow-lg shadow-pizza-red/20"
-                        : "bg-white/5 border-white/5 text-white/60"
+                        : "bg-gray-50 border-gray-200 text-gray-600"
                     }`}
                   >
                     {cat.name}
@@ -922,42 +1005,79 @@ export const ClientMenu = () => {
                 )}
               </div>
 
-              {/* Descuentos progresivos informativos */}
-              <div className="space-y-2.5 text-left">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-white/40">Descuentos Progresivos</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">🍕</span>
-                      <div>
-                        <span className="text-xs font-semibold block">Compras &gt; {formatCurrency(50, businessConfig.currency)}</span>
-                        <span className="text-[9px] text-white/40">Descuento del 5%</span>
+              {/* Cupones Disponibles en móvil */}
+              {availableCoupons.length > 0 && (
+                <div className="space-y-3 text-left">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white/40">Cupones Disponibles</h4>
+                  <div className="space-y-2.5">
+                    {availableCoupons.map(([code, discount]) => (
+                      <div 
+                        key={code} 
+                        className="relative bg-gradient-to-r from-pizza-red/5 to-pizza-gold/5 border border-pizza-red/10 rounded-2xl p-4 flex items-center justify-between overflow-hidden shadow-sm"
+                      >
+                        <div className="absolute top-1/2 -translate-y-1/2 -left-3 w-6 h-6 rounded-full bg-pizza-charcoal border-r border-pizza-red/10 z-10"></div>
+                        <div className="absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-6 rounded-full bg-pizza-charcoal border-l border-pizza-red/10 z-10"></div>
+                        <div className="absolute top-0 bottom-0 left-[70%] border-l border-dashed border-pizza-red/10"></div>
+
+                        <div className="flex-1 pr-4 flex items-center gap-2.5 text-left">
+                          <div className="w-8 h-8 rounded-lg bg-pizza-red/10 flex items-center justify-center text-pizza-red shrink-0">
+                            <Tag size={16} />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-extrabold text-white">{code}</h4>
+                            <p className="text-[9px] text-white/55">{discount}% de descuento en tu total</p>
+                          </div>
+                        </div>
+
+                        <div className="pl-3 shrink-0 flex flex-col items-center justify-center min-w-[70px]">
+                          {couponCode === code ? (
+                            <span className="text-[8px] bg-green-500/10 border border-green-500/35 text-green-600 font-bold px-1.5 py-1 rounded flex items-center gap-0.5 select-none">
+                              <Check size={8} />
+                              Aplicado
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => applyCoupon(code)}
+                              className="text-[8px] bg-pizza-red hover:bg-pizza-red/90 text-white font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer border-0"
+                            >
+                              Aplicar
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-xs font-extrabold text-pizza-gold">5% OFF</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">👑</span>
-                      <div>
-                        <span className="text-xs font-semibold block">Compras &gt; {formatCurrency(100, businessConfig.currency)}</span>
-                        <span className="text-[9px] text-white/40">Descuento del 10%</span>
-                      </div>
-                    </div>
-                    <span className="text-xs font-extrabold text-pizza-gold">10% OFF</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">💎</span>
-                      <div>
-                        <span className="text-xs font-semibold block">Compras &gt; {formatCurrency(150, businessConfig.currency)}</span>
-                        <span className="text-[9px] text-white/40">Descuento del 15%</span>
-                      </div>
-                    </div>
-                    <span className="text-xs font-extrabold text-pizza-gold">15% OFF</span>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* Descuentos progresivos informativos */}
+              {businessConfig.discounts?.autoDiscounts?.length > 0 && (
+                <div className="space-y-2.5 text-left">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white/40">Descuentos Progresivos</h4>
+                  <div className="space-y-2">
+                    {businessConfig.discounts.autoDiscounts.map((rule, idx) => {
+                      const emojis = ["🍕", "👑", "💎", "⭐", "🎉"];
+                      const emoji = emojis[idx % emojis.length];
+                      return (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{emoji}</span>
+                            <div>
+                              <span className="text-xs font-semibold block">
+                                Compras &gt; {formatCurrency(rule.minAmount, businessConfig.currency)}
+                              </span>
+                              <span className="text-[9px] text-white/40">
+                                Descuento automático del {rule.discountPercent}%
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-xs font-extrabold text-pizza-gold">{rule.discountPercent}% OFF</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1168,9 +1288,9 @@ export const ClientMenu = () => {
                           className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:border-pizza-red"
                         >
                           <option value="">Selecciona tu Mesa</option>
-                          {Array.from({ length: businessConfig.serviceModes?.tableNumbers || 20 }).map((_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              {businessConfig.serviceModes?.tableLabel || "Mesa"} {i + 1}
+                          {tablesList.map((t) => (
+                            <option key={t.id} value={t.name} disabled={t.status === "ocupada"}>
+                              {t.name} {t.status === "ocupada" ? "(Ocupada)" : "(Libre)"}
                             </option>
                           ))}
                         </select>
@@ -1364,7 +1484,7 @@ export const ClientMenu = () => {
               <a 
                 href="#/login" 
                 onClick={() => setInfoDrawerOpen(false)}
-                className="flex items-center justify-center gap-1.5 w-full bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl py-3 text-xs font-bold text-white"
+                className="flex items-center justify-center gap-1.5 w-full bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl py-3 text-xs font-bold text-gray-800 transition-colors"
               >
                 <User size={14} />
                 Acceso Personal
@@ -1376,43 +1496,88 @@ export const ClientMenu = () => {
 
       {/* Modal de Personalización (Común) */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#181818] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            {/* Cabecera */}
-            <div className="flex items-center justify-between p-5 border-b border-white/5 text-left">
-              <h3 className="font-pizza-title text-lg font-bold text-white">
-                Personalizar: {selectedProduct.name}
-              </h3>
-              <button
-                onClick={() => setSelectedProduct(null)}
-                className="p-1 rounded-full hover:bg-white/5 text-white/60 hover:text-white cursor-pointer border-0 bg-transparent"
-              >
-                <X size={20} />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#181818] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] relative">
+            
+            {/* Botón de Cerrar Absoluto */}
+            <button
+              onClick={() => setSelectedProduct(null)}
+              className="absolute top-4 right-4 z-20 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white cursor-pointer border-0 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Cabecera con Imagen (si existe) */}
+            {selectedProduct.imageUrl ? (
+              <div className="relative h-44 w-full shrink-0">
+                <img src={selectedProduct.imageUrl} alt={selectedProduct.name} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/45 to-black/25" />
+                <div className="absolute bottom-4 left-5 right-5 text-left">
+                  <h3 className="font-pizza-title text-xl font-bold text-white drop-shadow">
+                    {selectedProduct.name}
+                  </h3>
+                  {selectedProduct.description && (
+                    <p className="text-[11px] text-white/70 line-clamp-2 mt-1 leading-normal max-w-md">
+                      {selectedProduct.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-5 border-b border-white/5 text-left shrink-0">
+                <div>
+                  <h3 className="font-pizza-title text-lg font-bold text-white">
+                    Personalizar: {selectedProduct.name}
+                  </h3>
+                  {selectedProduct.description && (
+                    <p className="text-xs text-white/50 mt-1 max-w-xs">{selectedProduct.description}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Contenido Scrollable */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1 text-left">
               {/* Opciones del Producto */}
               {selectedProduct.options && Object.entries(selectedProduct.options).map(([groupName, values]) => (
-                <div key={groupName} className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">
-                    Seleccionar {groupName}:
+                <div key={groupName} className="space-y-2.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white/40">
+                    Elige tu {groupName}:
                   </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {values.map((val) => (
-                      <button
-                        key={val}
-                        onClick={() => handleOptionChange(groupName, val)}
-                        className={`px-4 py-3 rounded-2xl text-xs font-semibold border transition-all cursor-pointer text-left ${
-                          optionsSelected[groupName] === val
-                            ? "bg-pizza-red/10 border-pizza-red text-pizza-red font-bold"
-                            : "bg-pizza-dark/60 border-white/5 text-white/70 hover:bg-white/5"
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {values.map((val) => {
+                      const isSelected = optionsSelected[groupName] === val;
+                      const extraPrice = getOptionPriceAdjustment(val);
+                      const cleanedLabel = val.replace(/\s*\(\+\s*\$?\s*[0-9.]+\)/, "").trim();
+
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => handleOptionChange(groupName, val)}
+                          className={`px-4 py-3 rounded-2xl text-xs font-semibold border transition-all cursor-pointer flex flex-col justify-between text-left h-16 ${
+                            isSelected
+                              ? "bg-pizza-gold/10 border-pizza-gold text-[#ffd79b] font-black shadow-md shadow-pizza-gold/5"
+                              : "bg-[#111111] border-white/5 text-white/70 hover:bg-white/5 hover:border-white/10"
+                          }`}
+                        >
+                          <span className="truncate w-full">{cleanedLabel}</span>
+                          {extraPrice > 0 ? (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold self-end border mt-1.5 ${
+                              isSelected 
+                                ? "bg-pizza-gold/20 border-pizza-gold text-pizza-gold" 
+                                : "bg-white/5 border-white/10 text-white/50"
+                            }`}>
+                              + {formatCurrency(extraPrice, businessConfig.currency)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-white/30 font-medium self-end mt-1.5">
+                              Precio Base
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -1420,22 +1585,59 @@ export const ClientMenu = () => {
               {/* Items del Combo */}
               {selectedProduct.comboItems && (
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">
-                    Componentes de Combo:
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white/40">
+                    Componentes del Combo:
                   </h4>
-                  {selectedProduct.comboItems.map((cName, idx) => (
-                    <div key={idx} className="space-y-1.5">
-                      <span className="text-xs text-white/70">{cName}</span>
-                      <input
-                        type="text"
-                        placeholder="Ejemplo: Pizza Margherita / Sprite"
-                        required
-                        value={comboItemsSelected[idx] || ""}
-                        onChange={(e) => handleComboItemChange(idx, e.target.value)}
-                        className="w-full bg-pizza-dark/80 border border-white/5 rounded-xl px-4 py-2.5 text-white text-xs placeholder-white/20 focus:outline-none focus:border-pizza-red transition-all"
-                      />
-                    </div>
-                  ))}
+                  <div className="space-y-3">
+                    {selectedProduct.comboItems.map((itemText, idx) => {
+                      const parsed = parseComboItem(itemText);
+                      if (parsed.isSelection) {
+                        const currentValue = comboItemsSelected[idx] || "";
+                        const selectedOption = parsed.options.find(opt => `${parsed.name}: ${opt}` === currentValue || opt === currentValue) || parsed.options[0];
+                        
+                        return (
+                          <div key={idx} className="bg-pizza-dark/40 border border-white/5 rounded-2xl p-4.5 space-y-3">
+                            <span className="text-[11px] font-bold text-pizza-gold block uppercase tracking-wider">
+                              {parsed.name}
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              {parsed.options.map((opt) => {
+                                const isSelected = selectedOption === opt;
+                                return (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => handleComboItemChange(idx, `${parsed.name}: ${opt}`)}
+                                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                                      isSelected
+                                        ? "bg-pizza-red text-white font-extrabold border-pizza-red shadow-md shadow-pizza-red/10"
+                                        : "bg-pizza-charcoal border-white/5 text-white/70 hover:bg-white/5"
+                                    }`}
+                                  >
+                                    {opt}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div key={idx} className="bg-pizza-dark/25 border border-white/5 rounded-2xl p-3.5 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 font-extrabold text-xs">
+                                ✓
+                              </div>
+                              <span className="text-xs text-white/80 font-medium">{parsed.name}</span>
+                            </div>
+                            <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              Incluido
+                            </span>
+                          </div>
+                        );
+                      }
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -1444,6 +1646,7 @@ export const ClientMenu = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-white/50">Cantidad:</span>
                 <div className="flex items-center gap-4 bg-pizza-dark/80 rounded-2xl border border-white/5 p-1.5">
                   <button
+                    type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     className="p-1 text-white/60 hover:text-white hover:bg-white/5 rounded-xl cursor-pointer border-0 bg-transparent"
                   >
@@ -1451,6 +1654,7 @@ export const ClientMenu = () => {
                   </button>
                   <span className="text-sm font-bold w-6 text-center">{quantity}</span>
                   <button
+                    type="button"
                     onClick={() => {
                       const cartCountForProduct = cart
                         .filter((item) => item.id === selectedProduct.id)
@@ -1471,16 +1675,17 @@ export const ClientMenu = () => {
             </div>
 
             {/* Pie de modal */}
-            <div className="p-5 border-t border-white/5 bg-pizza-dark/65 flex items-center justify-between text-left">
+            <div className="p-5 border-t border-white/5 bg-pizza-dark/65 flex items-center justify-between text-left shrink-0">
               <div className="flex flex-col">
-                <span className="text-[10px] text-white/40">Total Adición:</span>
+                <span className="text-[10px] text-white/40 uppercase font-semibold tracking-wider">Total Adición:</span>
                 <span className="text-lg font-black text-pizza-gold">
-                  {formatCurrency((selectedProduct.price * (1 - (selectedProduct.discount || 0) / 100)) * quantity, businessConfig.currency)}
+                  {formatCurrency(getProductPriceWithExtras(selectedProduct, optionsSelected) * quantity, businessConfig.currency)}
                 </span>
               </div>
               <button
+                type="button"
                 onClick={handleAddToCart}
-                className="bg-pizza-red hover:bg-pizza-red/90 text-white rounded-2xl px-6 py-3 font-bold text-xs transition-all cursor-pointer shadow-lg shadow-pizza-red/20 border-0"
+                className="bg-pizza-red hover:bg-pizza-red/90 text-white rounded-2xl px-6 py-3 font-bold text-xs transition-all cursor-pointer shadow-lg shadow-pizza-red/20 border-0 active:scale-98"
               >
                 Agregar al Carrito
               </button>
@@ -1614,10 +1819,25 @@ export const ClientMenu = () => {
                         />
                         <button
                           type="submit"
-                          className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer text-white"
+                          className="bg-pizza-red hover:bg-pizza-red/90 text-white px-4 rounded-xl text-xs font-bold transition-all cursor-pointer border-0"
                         >
                           Aplicar
                         </button>
+                      </div>
+                    )}
+                    {!couponCode && availableCoupons.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1.5">
+                        <span className="text-[9px] text-white/40 block w-full">Sugeridos:</span>
+                        {availableCoupons.map(([code, discount]) => (
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => applyCoupon(code)}
+                            className="text-[9px] bg-pizza-red/10 border border-pizza-red/20 text-pizza-red hover:bg-pizza-red hover:text-white px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer"
+                          >
+                            {code} (-{discount}%)
+                          </button>
+                        ))}
                       </div>
                     )}
                     {couponError && (
@@ -1708,9 +1928,9 @@ export const ClientMenu = () => {
                           className="w-full bg-pizza-dark/80 border border-white/5 rounded-xl px-3.5 py-2.5 text-white text-xs focus:outline-none focus:border-pizza-red"
                         >
                           <option value="">Selecciona tu Mesa</option>
-                          {Array.from({ length: businessConfig.serviceModes?.tableNumbers || 20 }).map((_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              {businessConfig.serviceModes?.tableLabel || "Mesa"} {i + 1}
+                          {tablesList.map((t) => (
+                            <option key={t.id} value={t.name} disabled={t.status === "ocupada"}>
+                              {t.name} {t.status === "ocupada" ? "(Ocupada)" : "(Libre)"}
                             </option>
                           ))}
                         </select>

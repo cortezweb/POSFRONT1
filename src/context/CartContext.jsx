@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/config";
+import { getProductPriceWithExtras } from "../utils/formatters";
 
 const CartContext = createContext();
 
@@ -49,7 +50,19 @@ export const CartProvider = ({ children }) => {
     const docRef = doc(db, "config", "settings");
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
-        setBusinessConfig(docSnap.data());
+        const data = docSnap.data();
+        setBusinessConfig(data);
+        
+        // Actualizar título de la pestaña del navegador dinámicamente en todo el proyecto
+        if (data.name) {
+          document.title = `${data.name} | Menú Digital & POS Express`;
+          
+          // Actualizar meta-descripción dinámicamente para mejorar SEO en todo el proyecto
+          const metaDesc = document.querySelector('meta[name="description"]');
+          if (metaDesc) {
+            metaDesc.setAttribute("content", `Ordena tus pizzas y platillos favoritos en ${data.name} con nuestra VCard digital integrada. Servicio rápido de delivery, recojo o consumo en local.`);
+          }
+        }
       }
     }, (error) => {
       console.warn("No se pudo cargar la configuración de Firestore. Usando defaults locales.", error);
@@ -70,11 +83,9 @@ export const CartProvider = ({ children }) => {
             : item
         );
       } else {
-        // Calcular precio de oferta si tiene descuento individual
+        // Calcular precio de oferta incluyendo el ajuste de opciones extras y el descuento
         const discount = product.discount || 0;
-        const finalPrice = discount > 0 
-          ? product.price * (1 - discount / 100) 
-          : product.price;
+        const finalPrice = getProductPriceWithExtras(product, optionsSelected);
 
         return [
           ...prevCart,

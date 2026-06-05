@@ -11,6 +11,23 @@
   --color-pizza-dark: #212121; /* Deep Charcoal */
 }
 
+:root {
+  --chart-text: #5f5e5e;
+  --chart-grid: rgba(0, 0, 0, 0.08);
+  --chart-line-sales: #ff5722;
+  --chart-line-sales-end: #b02f00;
+  --chart-area-sales: rgba(255, 87, 34, 0.12);
+  --chart-line-expense: #ef4444;
+  --chart-area-expense: rgba(239, 68, 68, 0.12);
+  --chart-line-income: #10b981;
+  --chart-area-income: rgba(16, 185, 129, 0.12);
+  --chart-bg-track: rgba(0, 0, 0, 0.04);
+  --chart-bar-start: #ff9f43;
+  --chart-bar-end: #ff5722;
+  --chart-hover-line: rgba(176, 47, 0, 0.15);
+}
+
+
 /* Reglas Globales */
 html, body {
   background-color: var(--color-pizza-charcoal);
@@ -194,6 +211,10 @@ textarea::placeholder {
 .text-\[\#ffd79b\],
 .text-\[\#ffd79b\]\/80 {
   color: #b02f00 !important;
+}
+
+.text-emerald-400:not(aside *):not(header *):not(button *):not(.keep-white) {
+  color: #059669 !important; /* Legible Dark Green for Light Mode */
 }
 
 /* 7. Preservar Contenedores Oscuros (Sidebars y Headers que especifica el Diseño) */

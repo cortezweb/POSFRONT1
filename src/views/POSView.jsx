@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useCart } from "../context/CartContext";
 import { db } from "../firebase/config";
 import { collection, getDocs, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, orderBy } from "firebase/firestore";
-import { formatCurrency } from "../utils/formatters";
+import { formatCurrency, parseComboItem, getProductPriceWithExtras, getOptionPriceAdjustment } from "../utils/formatters";
 import { MapboxSearch } from "../components/MapboxSearch";
 import { 
   ShoppingBag, Plus, Minus, X, ChevronRight, LogOut, Menu, Search, Volume2, VolumeX, Bell, CheckCircle, XCircle, Printer
@@ -10,7 +10,7 @@ import {
 import { logoutUser } from "../firebase/auth";
 import { TicketTemplate } from "../components/TicketTemplate";
 
-export const POSView = ({ user, onLogout, isEmbedded = false }) => {
+export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false }) => {
   const {
     cart, addToCart, updateQuantity, clearCart,
     shippingCost, shippingDistance, serviceMode, setServiceMode,
@@ -32,6 +32,20 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
   const [successMsg, setSuccessMsg] = useState("");
   const [activeMobileTab, setActiveMobileTab] = useState("menu");
   const [posSearch, setPosSearch] = useState("");
+  const [tablesList, setTablesList] = useState([]);
+
+  // Obtener mesas en tiempo real
+  useEffect(() => {
+    const q = query(collection(db, "tables"), orderBy("name", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setTablesList(list);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [pendingOrders, setPendingOrders] = useState([]);
   const [isApprovalTrayOpen, setIsApprovalTrayOpen] = useState(false);
@@ -240,8 +254,17 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
     }
     setOptionsSelected(initialOpts);
 
+    // Inicializar selecciones de combos auto-seleccionando opciones e items fijos
     if (product.comboItems) {
-      setComboItemsSelected(Array(product.comboItems.length).fill(""));
+      const initialCombos = product.comboItems.map((itemText) => {
+        const parsed = parseComboItem(itemText);
+        if (parsed.isSelection) {
+          return parsed.options[0] ? `${parsed.name}: ${parsed.options[0]}` : parsed.name;
+        } else {
+          return parsed.name;
+        }
+      });
+      setComboItemsSelected(initialCombos);
     } else {
       setComboItemsSelected([]);
     }
@@ -368,7 +391,7 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
     <div className={isEmbedded ? "w-full h-[calc(100vh-80px)] overflow-hidden" : "min-h-screen bg-pizza-charcoal text-white"}>
       
       {/* -------------------- INTERFAZ DESKTOP (MD y superior) -------------------- */}
-      <div className="hidden md:flex flex-row w-full h-full min-h-screen">
+      <div className={`hidden md:flex flex-row w-full h-full ${isEmbedded ? "min-h-full" : "min-h-screen"}`}>
         {/* Panel Izquierdo: Catálogo y Categorías */}
         <div className="flex-1 p-4 lg:p-6 overflow-y-auto max-h-full border-r border-white/5 flex flex-col">
           {/* Cabecera del POS */}
@@ -476,7 +499,7 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
           </div>
 
           {/* Grid de Productos */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto flex-1 pr-1">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto flex-1 pr-1 content-start">
             {filteredProducts.length === 0 ? (
               <div className="col-span-full py-12 flex flex-col items-center justify-center text-center bg-[#181818]/40 border border-white/5 rounded-2xl p-6">
                 <span className="text-4xl mb-3">🔍</span>
@@ -535,7 +558,7 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
         </div>
 
         {/* Panel Derecho: Carrito de Compras del POS */}
-        <div className="w-full md:w-[420px] bg-[#101010] border-l border-white/5 p-6 flex flex-col justify-between max-h-screen overflow-y-auto shrink-0">
+        <div className={`w-full md:w-[420px] bg-[#101010] border-l border-white/5 p-6 flex flex-col justify-between ${isEmbedded ? "max-h-full" : "max-h-screen"} overflow-y-auto shrink-0`}>
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="font-pizza-title text-base font-bold flex items-center gap-1.5">
@@ -620,7 +643,7 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
             <form onSubmit={handleSaveOrder} className="space-y-4 pt-4 border-t border-white/5 text-left">
               <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">Datos del Cliente</h4>
               
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 <input
                   type="text"
                   required
@@ -695,9 +718,9 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
                   className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white"
                 >
                   <option value="">Selecciona Mesa</option>
-                  {Array.from({ length: businessConfig.serviceModes?.tableNumbers || 20 }).map((_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {businessConfig.serviceModes?.tableLabel || "Mesa"} {i + 1}
+                  {tablesList.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} ({t.status === "ocupada" ? "Ocupada" : "Libre"})
                     </option>
                   ))}
                 </select>
@@ -859,7 +882,7 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
               </div>
 
               {/* Grid de pizzas */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 content-start">
                 {filteredProducts.length === 0 ? (
                   <div className="col-span-full py-8 flex flex-col items-center justify-center text-center bg-[#181818]/40 border border-white/5 rounded-2xl p-4">
                     <span className="text-3xl mb-2">🔍</span>
@@ -998,7 +1021,7 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
                   <div className="space-y-4 pt-4 border-t border-white/5 text-left">
                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">Datos del Cliente</h4>
                     
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2">
                       <input
                         type="text"
                         required
@@ -1073,9 +1096,9 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
                         className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white"
                       >
                         <option value="">Selecciona Mesa</option>
-                        {Array.from({ length: businessConfig.serviceModes?.tableNumbers || 20 }).map((_, i) => (
-                          <option key={i + 1} value={i + 1}>
-                            {businessConfig.serviceModes?.tableLabel || "Mesa"} {i + 1}
+                        {tablesList.map((t) => (
+                          <option key={t.id} value={t.name}>
+                            {t.name} ({t.status === "ocupada" ? "Ocupada" : "Libre"})
                           </option>
                         ))}
                       </select>
@@ -1232,76 +1255,162 @@ export const POSView = ({ user, onLogout, isEmbedded = false }) => {
       {/* Modal de Personalización (Común) */}
       {selectedProduct && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#181818] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between p-4 border-b border-white/5">
-              <h3 className="font-pizza-title text-sm font-bold">Personalizar: {selectedProduct.name}</h3>
-              <button onClick={() => setSelectedProduct(null)} className="p-1 rounded-full hover:bg-white/5 border-0 bg-transparent cursor-pointer">
-                <X size={18} />
-              </button>
-            </div>
+          <div className="w-full max-w-lg bg-[#181818] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] relative">
             
-            <div className="p-5 overflow-y-auto space-y-5 text-left flex-1">
+            {/* Botón de Cerrar Absoluto */}
+            <button
+              onClick={() => setSelectedProduct(null)}
+              className="absolute top-4 right-4 z-20 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white cursor-pointer border-0 transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Cabecera con Imagen (si existe) */}
+            {selectedProduct.imageUrl ? (
+              <div className="relative h-36 w-full shrink-0">
+                <img src={selectedProduct.imageUrl} alt={selectedProduct.name} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/45 to-black/25" />
+                <div className="absolute bottom-3 left-4 right-4 text-left">
+                  <h3 className="font-pizza-title text-base font-bold text-white">
+                    {selectedProduct.name}
+                  </h3>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-4 border-b border-white/5 text-left shrink-0">
+                <h3 className="font-pizza-title text-sm font-bold text-white">
+                  Personalizar: {selectedProduct.name}
+                </h3>
+              </div>
+            )}
+
+            {/* Contenido Scrollable */}
+            <div className="p-5 overflow-y-auto space-y-5 flex-1 text-left">
+              {/* Opciones del Producto */}
               {selectedProduct.options && Object.entries(selectedProduct.options).map(([groupName, values]) => (
-                <div key={groupName} className="space-y-1.5">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-white/40">{groupName}:</h4>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {values.map((val) => (
-                      <button
-                        key={val}
-                        onClick={() => handleOptionChange(groupName, val)}
-                        className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer text-left ${
-                          optionsSelected[groupName] === val
-                            ? "bg-pizza-red/10 border-pizza-red text-pizza-red font-bold"
-                            : "bg-[#101010] border-white/5 text-white/70"
-                        }`}
-                      >
-                        {val}
-                      </button>
-                    ))}
+                <div key={groupName} className="space-y-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                    {groupName}:
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {values.map((val) => {
+                      const isSelected = optionsSelected[groupName] === val;
+                      const extraPrice = getOptionPriceAdjustment(val);
+                      const cleanedLabel = val.replace(/\s*\(\+\s*\$?\s*[0-9.]+\)/, "").trim();
+
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => handleOptionChange(groupName, val)}
+                          className={`px-3 py-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex flex-col justify-between text-left h-14 ${
+                            isSelected
+                              ? "bg-pizza-gold/10 border-pizza-gold text-[#ffd79b] font-black"
+                              : "bg-[#111111] border-white/5 text-white/70 hover:bg-white/5"
+                          }`}
+                        >
+                          <span className="truncate w-full">{cleanedLabel}</span>
+                          {extraPrice > 0 ? (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold self-end border mt-1 ${
+                              isSelected 
+                                ? "bg-pizza-gold/20 border-pizza-gold text-pizza-gold" 
+                                : "bg-white/5 border-white/10 text-white/50"
+                            }`}>
+                              + {formatCurrency(extraPrice, businessConfig.currency)}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-white/30 font-medium self-end mt-1">
+                              Base
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
 
+              {/* Items del Combo */}
               {selectedProduct.comboItems && (
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-white/40">Opciones de Combo:</h4>
-                  {selectedProduct.comboItems.map((cName, idx) => (
-                    <div key={idx} className="space-y-1">
-                      <span className="text-xs text-white/60">{cName}</span>
-                      <input
-                        type="text"
-                        placeholder="Ejemplo: Pizza Margherita"
-                        required
-                        value={comboItemsSelected[idx] || ""}
-                        onChange={(e) => handleComboItemChange(idx, e.target.value)}
-                        className="w-full bg-[#101010] border border-white/5 rounded-xl px-3 py-2 text-white text-xs"
-                      />
-                    </div>
-                  ))}
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                    Opciones de Combo:
+                  </h4>
+                  <div className="space-y-2.5">
+                    {selectedProduct.comboItems.map((itemText, idx) => {
+                      const parsed = parseComboItem(itemText);
+                      if (parsed.isSelection) {
+                        const currentValue = comboItemsSelected[idx] || "";
+                        const selectedOption = parsed.options.find(opt => `${parsed.name}: ${opt}` === currentValue || opt === currentValue) || parsed.options[0];
+                        
+                        return (
+                          <div key={idx} className="bg-pizza-dark/40 border border-white/5 rounded-xl p-3.5 space-y-2">
+                            <span className="text-[10px] font-bold text-pizza-gold block uppercase tracking-wider">
+                              {parsed.name}
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {parsed.options.map((opt) => {
+                                const isSelected = selectedOption === opt;
+                                return (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => handleComboItemChange(idx, `${parsed.name}: ${opt}`)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                                      isSelected
+                                        ? "bg-pizza-red text-white font-extrabold border-pizza-red"
+                                        : "bg-pizza-charcoal border-white/5 text-white/70 hover:bg-white/5"
+                                    }`}
+                                  >
+                                    {opt}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div key={idx} className="bg-pizza-dark/25 border border-white/5 rounded-xl p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-emerald-500 font-extrabold text-xs">✓</span>
+                              <span className="text-xs text-white/80 font-medium">{parsed.name}</span>
+                            </div>
+                            <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                              Incluido
+                            </span>
+                          </div>
+                        );
+                      }
+                    })}
+                  </div>
                 </div>
               )}
 
+              {/* Selector de Cantidad */}
               <div className="flex items-center justify-between pt-3 border-t border-white/5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Cantidad:</span>
                 <div className="flex items-center gap-3 bg-[#101010] rounded-xl p-1 border border-white/5">
-                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-1 text-white/60 hover:text-white border-0 bg-transparent cursor-pointer">
+                  <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-1 text-white/60 hover:text-white border-0 bg-transparent cursor-pointer">
                     <Minus size={14} />
                   </button>
                   <span className="text-xs font-bold w-5 text-center">{quantity}</span>
-                  <button onClick={() => setQuantity(quantity + 1)} className="p-1 text-white/60 hover:text-white border-0 bg-transparent cursor-pointer">
+                  <button type="button" onClick={() => setQuantity(quantity + 1)} className="p-1 text-white/60 hover:text-white border-0 bg-transparent cursor-pointer">
                     <Plus size={14} />
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-[#101010] flex items-center justify-between">
+            {/* Pie de modal */}
+            <div className="p-4 border-t border-white/5 bg-[#101010] flex items-center justify-between shrink-0">
               <span className="text-sm font-bold text-pizza-gold">
-                Total: {formatCurrency((selectedProduct.price * (1 - (selectedProduct.discount || 0) / 100)) * quantity, businessConfig.currency)}
+                Total: {formatCurrency(getProductPriceWithExtras(selectedProduct, optionsSelected) * quantity, businessConfig.currency)}
               </span>
               <button
+                type="button"
                 onClick={handleAddToCart}
-                className="bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer border-0"
+                className="bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl px-5 py-2 text-xs font-bold transition-all cursor-pointer border-0 active:scale-98"
               >
                 Agregar
               </button>

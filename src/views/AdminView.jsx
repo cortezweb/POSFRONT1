@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { db, firebaseConfig } from "../firebase/config";
+import { db, firebaseConfig, storage } from "../firebase/config";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { compressImage } from "../utils/imageCompressor";
 
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -15,14 +16,20 @@ import { logoutUser } from "../firebase/auth";
 import { SoundNotification } from "../components/SoundNotification";
 import { TicketTemplate } from "../components/TicketTemplate";
 import { POSView } from "./POSView";
+import { CookView } from "./CookView";
 import { 
   Check, X, Printer, Settings, LogOut, Loader2, ClipboardList, MessageSquare, 
   MapPin, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, 
   Download, Plus, Trash2, Edit2, Menu, Lock, Unlock, FileText, Search, Store,
-  TrendingUp, Tag
+  TrendingUp, Tag, Table, ChefHat
 } from "lucide-react";
 
-export const AdminView = ({ user, onLogout }) => {
+import { usePermissions } from "../hooks/usePermissions";
+import { PERMISSIONS, ROLES_PERMISSIONS } from "../utils/permissionsConfig";
+import { HasPermission } from "../components/HasPermission";
+
+export const AdminView = ({ user, role, permissions, onLogout }) => {
+  const { hasPermission } = usePermissions(role, permissions);
   const [activeTab, setActiveTab] = useState("pedidos");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -37,6 +44,13 @@ export const AdminView = ({ user, onLogout }) => {
   // Hover states for custom SVG graphs
   const [hoveredHourPoint, setHoveredHourPoint] = useState(null);
   const [hoveredProductIndex, setHoveredProductIndex] = useState(null);
+
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadLogoError, setUploadLogoError] = useState("");
+
+  const [visualOptions, setVisualOptions] = useState([]);
+  const [visualCombos, setVisualCombos] = useState([]);
+  const [editorMode, setEditorMode] = useState("visual"); // 'visual' | 'text'
 
   // Configuración del negocio leída para el ticket y administración
   const [businessConfig, setBusinessConfig] = useState({
@@ -55,6 +69,11 @@ export const AdminView = ({ user, onLogout }) => {
 
   // Catálogo de Productos (Inventario)
   const [productsList, setProductsList] = useState([]);
+  // Mesas
+  const [tablesList, setTablesList] = useState([]);
+  const [tableNameForm, setTableNameForm] = useState("");
+  const [tableCapacityForm, setTableCapacityForm] = useState("4");
+  const [editingTable, setEditingTable] = useState(null);
   // Lista de usuarios registrada en Firestore (Personal)
   const [usersList, setUsersList] = useState([]);
   // Auditoría
@@ -85,7 +104,10 @@ export const AdminView = ({ user, onLogout }) => {
   const [staffEmail, setStaffEmail] = useState("");
   const [staffPassword, setStaffPassword] = useState("");
   const [staffRole, setStaffRole] = useState("cashier");
+  const [staffPermissions, setStaffPermissions] = useState([]);
   const [staffRegistering, setStaffRegistering] = useState(false);
+  const [editingPermissionsUser, setEditingPermissionsUser] = useState(null);
+  const [editingPermissionsList, setEditingPermissionsList] = useState([]);
 
   // Arqueo de Caja
   const [cashBase, setCashBase] = useState("");
@@ -110,6 +132,126 @@ export const AdminView = ({ user, onLogout }) => {
     optionsText: "", // "Tamaño: Mediana, Familiar\nMasa: Tradicional, Fina"
     comboItemsText: "" // line separated
   });
+
+  useEffect(() => {
+    if (isCrudModalOpen) {
+      // Inicializar constructor visual desde los strings de crudForm
+      const parsedOpts = [];
+      if (crudForm.optionsText?.trim()) {
+        crudForm.optionsText.split("\n").forEach((line, idx) => {
+          const parts = line.split(":");
+          if (parts.length === 2) {
+            parsedOpts.push({
+              id: Date.now() + idx,
+              name: parts[0].trim(),
+              values: parts[1].split(",").map(v => v.trim()).filter(Boolean)
+            });
+          }
+        });
+      }
+      setVisualOptions(parsedOpts);
+
+      const parsedCombos = [];
+      if (crudForm.comboItemsText?.trim()) {
+        crudForm.comboItemsText.split("\n").forEach((item, idx) => {
+          if (item.trim()) {
+            parsedCombos.push({
+              id: Date.now() + idx,
+              value: item.trim()
+            });
+          }
+        });
+      }
+      setVisualCombos(parsedCombos);
+      setEditorMode("visual"); // Resetear a visual por defecto al abrir
+    }
+  }, [isCrudModalOpen]);
+
+  // Sincronizar estados visuales con los campos de texto correspondientes
+  const syncOptionsToText = (newGroups) => {
+    const text = newGroups
+      .map(g => `${g.name.trim()}: ${g.values.map(v => v.trim()).join(", ")}`)
+      .filter(line => line.split(":")[0].trim()) // Filtrar vacíos
+      .join("\n");
+    setCrudForm(prev => ({ ...prev, optionsText: text }));
+  };
+
+  const syncCombosToText = (newCombos) => {
+    const text = newCombos
+      .map(c => c.value.trim())
+      .filter(Boolean)
+      .join("\n");
+    setCrudForm(prev => ({ ...prev, comboItemsText: text }));
+  };
+
+  // Manejadores interactivos para Opciones y Tamaños
+  const handleAddOptionGroup = () => {
+    const newGroups = [
+      ...visualOptions,
+      { id: Date.now(), name: "Nuevo Grupo", values: [] }
+    ];
+    setVisualOptions(newGroups);
+    syncOptionsToText(newGroups);
+  };
+
+  const handleUpdateGroupName = (id, newName) => {
+    const newGroups = visualOptions.map(g => g.id === id ? { ...g, name: newName } : g);
+    setVisualOptions(newGroups);
+    syncOptionsToText(newGroups);
+  };
+
+  const handleRemoveOptionGroup = (id) => {
+    const newGroups = visualOptions.filter(g => g.id !== id);
+    setVisualOptions(newGroups);
+    syncOptionsToText(newGroups);
+  };
+
+  const handleAddOptionValue = (groupId, val) => {
+    if (!val.trim()) return;
+    const newGroups = visualOptions.map(g => {
+      if (g.id === groupId) {
+        // Evitar duplicados
+        if (g.values.includes(val.trim())) return g;
+        return { ...g, values: [...g.values, val.trim()] };
+      }
+      return g;
+    });
+    setVisualOptions(newGroups);
+    syncOptionsToText(newGroups);
+  };
+
+  const handleRemoveOptionValue = (groupId, valIdx) => {
+    const newGroups = visualOptions.map(g => {
+      if (g.id === groupId) {
+        return { ...g, values: g.values.filter((_, idx) => idx !== valIdx) };
+      }
+      return g;
+    });
+    setVisualOptions(newGroups);
+    syncOptionsToText(newGroups);
+  };
+
+  // Manejadores interactivos para Ítems de Combo
+  const handleAddComboItem = () => {
+    const newCombos = [
+      ...visualCombos,
+      { id: Date.now(), value: "" }
+    ];
+    setVisualCombos(newCombos);
+    syncCombosToText(newCombos);
+  };
+
+  const handleUpdateComboItem = (id, newValue) => {
+    const newCombos = visualCombos.map(c => c.id === id ? { ...c, value: newValue } : c);
+    setVisualCombos(newCombos);
+    syncCombosToText(newCombos);
+  };
+
+  const handleRemoveComboItem = (id) => {
+    const newCombos = visualCombos.filter(c => c.id !== id);
+    setVisualCombos(newCombos);
+    syncCombosToText(newCombos);
+  };
 
   // Gestión de Categorías
   const [categoriesList, setCategoriesList] = useState([]);
@@ -239,6 +381,24 @@ export const AdminView = ({ user, onLogout }) => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Suscribirse a mesas
+  useEffect(() => {
+    const q = query(collection(db, "tables"), orderBy("name", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setTablesList(list);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sincronizar permisos por defecto cuando cambia el rol a registrar
+  useEffect(() => {
+    setStaffPermissions(ROLES_PERMISSIONS[staffRole] || []);
+  }, [staffRole]);
 
   // Suscribirse a turnos de caja
   useEffect(() => {
@@ -462,16 +622,18 @@ export const AdminView = ({ user, onLogout }) => {
       const cred = await createUserWithEmailAndPassword(secondaryAuth, staffEmail, staffPassword);
       const uid = cred.user.uid;
       
-      // Guardar rol en colección principal de Firestore
+      // Guardar rol y permisos en colección principal de Firestore
       await setDoc(doc(db, "users", uid), {
         email: staffEmail,
         role: staffRole,
+        permissions: staffPermissions,
         disabled: false
       });
 
       await logAuditEvent(user.email, "CREAR_PERSONAL", `Creado personal: ${staffEmail} con rol: ${staffRole}`);
       setStaffEmail("");
       setStaffPassword("");
+      setStaffPermissions([]);
       alert(`Usuario ${staffEmail} registrado exitosamente con rol ${staffRole}.`);
     } catch (err) {
       console.error("Error al registrar personal:", err);
@@ -920,6 +1082,79 @@ export const AdminView = ({ user, onLogout }) => {
     );
   });
 
+  // Manejar subida de Logo comercial (Cloudinary -> Storage -> Base64)
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    setUploadLogoError("");
+
+    try {
+      // 1. Comprimir imagen localmente (WebP) a tamaño logo
+      const compressedBlob = await compressImage(file, 400, 0.8);
+      const compressedFile = new File([compressedBlob], `logo_${Date.now()}.webp`, { type: "image/webp" });
+
+      // A. Intentar con Cloudinary primero
+      if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET) {
+        try {
+          const formData = new FormData();
+          formData.append("file", compressedFile);
+          formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+          const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: "POST",
+            body: formData
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            let secureUrl = data.secure_url;
+            if (secureUrl.includes("/upload/")) {
+              secureUrl = secureUrl.replace("/upload/", "/upload/f_auto,q_auto/");
+            }
+            setSettingsForm((prev) => ({ ...prev, logoUrl: secureUrl }));
+            setUploadingLogo(false);
+            return;
+          }
+        } catch (cloudinaryErr) {
+          console.warn("Fallo subida a Cloudinary, intentando Firebase Storage...", cloudinaryErr);
+        }
+      }
+
+      // B. Intentar con Firebase Storage
+      if (storage) {
+        try {
+          const logoRef = ref(storage, `logos/business_logo_${Date.now()}.webp`);
+          await uploadBytes(logoRef, compressedFile);
+          const downloadURL = await getDownloadURL(logoRef);
+          setSettingsForm((prev) => ({ ...prev, logoUrl: downloadURL }));
+          setUploadingLogo(false);
+          return;
+        } catch (firebaseStorageErr) {
+          console.warn("Fallo subida a Firebase Storage, recurriendo a Base64...", firebaseStorageErr);
+        }
+      }
+
+      // C. Fallback: Guardar como Base64 en Firestore
+      const reader = new FileReader();
+      reader.readAsDataURL(compressedBlob);
+      reader.onloadend = () => {
+        const base64data = reader.result;
+        setSettingsForm((prev) => ({ ...prev, logoUrl: base64data }));
+        setUploadingLogo(false);
+      };
+      reader.onerror = (readErr) => {
+        throw readErr;
+      };
+
+    } catch (err) {
+      console.error("Error al procesar subida de logo:", err);
+      setUploadLogoError(err.message || "Error al procesar el archivo del logo.");
+      setUploadingLogo(false);
+    }
+  };
+
   // Guardar Cambios Configuración General
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -1183,24 +1418,81 @@ export const AdminView = ({ user, onLogout }) => {
     }
   };
 
+  const handleSaveTable = async (e) => {
+    e.preventDefault();
+    if (!tableNameForm.trim()) {
+      alert("El nombre de la mesa es requerido.");
+      return;
+    }
+    const tId = editingTable ? editingTable.id : tableNameForm.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || Date.now().toString();
+    try {
+      await setDoc(doc(db, "tables", tId), {
+        id: tId,
+        name: tableNameForm.trim(),
+        capacity: parseInt(tableCapacityForm, 10) || 4,
+        status: editingTable ? editingTable.status : "libre"
+      });
+      setTableNameForm("");
+      setTableCapacityForm("4");
+      setEditingTable(null);
+      await logAuditEvent(user.email, editingTable ? "EDITAR_MESA" : "CREAR_MESA", `Mesa: ${tableNameForm.trim()} (ID: ${tId})`);
+      alert("Mesa guardada exitosamente.");
+    } catch (err) {
+      console.error("Error al guardar mesa:", err);
+      alert("Error al guardar mesa.");
+    }
+  };
+
+  const handleToggleTableStatus = async (table) => {
+    try {
+      const nextStatus = table.status === "ocupada" ? "libre" : "ocupada";
+      await updateDoc(doc(db, "tables", table.id), { status: nextStatus });
+      await logAuditEvent(user.email, "CAMBIAR_ESTADO_MESA", `Mesa ${table.name} cambiada a ${nextStatus}`);
+    } catch (err) {
+      console.error("Error al cambiar estado de mesa:", err);
+      alert("Error al cambiar el estado.");
+    }
+  };
+
+  const handleDeleteTable = async (tId, name) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar la mesa "${name}"?`)) return;
+    try {
+      await deleteDoc(doc(db, "tables", tId));
+      await logAuditEvent(user.email, "ELIMINAR_MESA", `Mesa eliminada: ${name} (ID: ${tId})`);
+      alert("Mesa eliminada.");
+    } catch (err) {
+      console.error("Error al eliminar mesa:", err);
+      alert("Error al eliminar mesa.");
+    }
+  };
+
   // Definición de las pestañas del Dashboard
   const tabsList = [
-    { id: "pedidos", label: "Pedidos Activos", icon: ClipboardList },
-    { id: "pos", label: "POS Caja", icon: Store },
-    { id: "ventas", label: "Reporte Ventas", icon: BarChart3 },
-    { id: "finanzas", label: "Resultados Financieros", icon: TrendingUp },
-    { id: "inventario", label: "Inventario CRUD", icon: Package },
-    { id: "categorias", label: "Categorías", icon: Tag },
-    { id: "contactos", label: "Clientes", icon: Users },
-    { id: "personal", label: "Gestión Personal", icon: Lock },
-    { id: "caja", label: "Arqueo de Caja", icon: DollarSign },
-    { id: "turnos", label: "Historial Turnos (Z)", icon: FileText },
-    { id: "auditoria", label: "Auditoría Logs", icon: ShieldAlert },
-    { id: "tienda", label: "Tienda Online", icon: Globe },
-    { id: "configuracion", label: "Configuración", icon: Settings },
-    { id: "seo", label: "Optimización SEO", icon: Search },
-    { id: "marketing", label: "Marketing / Cupones", icon: Percent }
-  ];
+    { id: "pedidos", label: "Pedidos Activos", icon: ClipboardList, permission: PERMISSIONS.VER_PEDIDOS },
+    { id: "cocina", label: "Cocina KDS", icon: ChefHat, permission: PERMISSIONS.ACCESO_COCINA },
+    { id: "pos", label: "POS Caja", icon: Store, permission: PERMISSIONS.ACCESO_POS },
+    { id: "ventas", label: "Reporte Ventas", icon: BarChart3, permission: PERMISSIONS.VER_VENTAS },
+    { id: "finanzas", label: "Resultados Financieros", icon: TrendingUp, permission: PERMISSIONS.VER_FINANZAS },
+    { id: "inventario", label: "Inventario CRUD", icon: Package, permission: PERMISSIONS.VER_INVENTARIO },
+    { id: "categorias", label: "Categorías", icon: Tag, permission: PERMISSIONS.VER_INVENTARIO },
+    { id: "mesas", label: "Gestión Mesas", icon: Table, permission: PERMISSIONS.VER_MESAS },
+    { id: "contactos", label: "Clientes", icon: Users, permission: PERMISSIONS.VER_CLIENTES },
+    { id: "personal", label: "Gestión Personal", icon: Lock, permission: PERMISSIONS.VER_PERSONAL },
+    { id: "caja", label: "Arqueo de Caja", icon: DollarSign, permission: PERMISSIONS.VER_CAJA },
+    { id: "turnos", label: "Historial Turnos (Z)", icon: FileText, permission: PERMISSIONS.VER_HISTORIAL_TURNOS },
+    { id: "auditoria", label: "Auditoría Logs", icon: ShieldAlert, permission: PERMISSIONS.VER_AUDITORIA },
+    { id: "tienda", label: "Tienda Online", icon: Globe, permission: PERMISSIONS.CONFIGURAR_TIENDA },
+    { id: "configuracion", label: "Configuración", icon: Settings, permission: PERMISSIONS.CONFIGURAR_TIENDA },
+    { id: "seo", label: "Optimización SEO", icon: Search, permission: PERMISSIONS.CONFIGURAR_TIENDA },
+    { id: "marketing", label: "Marketing / Cupones", icon: Percent, permission: PERMISSIONS.CONFIGURAR_TIENDA }
+  ].filter(tab => hasPermission(tab.permission));
+
+  // Redirigir a la primera pestaña permitida si la seleccionada actualmente no está autorizada
+  useEffect(() => {
+    if (tabsList.length > 0 && !tabsList.find(t => t.id === activeTab)) {
+      setActiveTab(tabsList[0].id);
+    }
+  }, [tabsList, activeTab]);
 
   return (
     <div className="min-h-screen bg-pizza-charcoal text-white flex flex-col md:flex-row print:bg-white print:text-black">
@@ -1219,7 +1511,7 @@ export const AdminView = ({ user, onLogout }) => {
             <span className="text-2xl">🍕</span>
           )}
           <span className="font-pizza-title font-bold text-sm">
-            {businessConfig.name || "Pizza Hub"} (ADM)
+            {businessConfig.name || "Pizza Hub"} ({role === "admin" ? "ADM" : role === "cashier" ? "CAJ" : "COC"})
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -1252,7 +1544,9 @@ export const AdminView = ({ user, onLogout }) => {
                     <h2 className="font-pizza-title font-bold leading-none text-base">
                       {businessConfig.name || "Pizza Hub"}
                     </h2>
-                    <span className="text-[10px] text-white/50">Admin Panel</span>
+                    <span className="text-[10px] text-white/50">
+                      {role === "admin" ? "Panel Administrador" : role === "cashier" ? "Panel Cajero" : "Panel Cocina"}
+                    </span>
                   </div>
                 </div>
                 <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-white/60 hover:text-white">
@@ -1312,8 +1606,14 @@ export const AdminView = ({ user, onLogout }) => {
             <div>
               <h2 className="font-pizza-title text-base font-bold flex items-center gap-1.5 leading-none">
                 {businessConfig.name || "Pizza Hub"}
-                <span className="bg-pizza-red/20 text-pizza-red border border-pizza-red/35 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
-                  Admin
+                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                  role === "admin" 
+                    ? "bg-pizza-red/20 text-pizza-red border border-pizza-red/35" 
+                    : role === "cashier"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/35"
+                      : "bg-amber-500/20 text-amber-400 border border-amber-500/35"
+                }`}>
+                  {role === "admin" ? "Admin" : role === "cashier" ? "Cajero" : "Cocinero"}
                 </span>
               </h2>
               <span className="text-[10px] text-white/40 block mt-1">{user.email}</span>
@@ -1355,9 +1655,11 @@ export const AdminView = ({ user, onLogout }) => {
       {/* Main Right Pane Content */}
       <main className="flex-1 overflow-y-auto min-h-screen bg-pizza-charcoal p-4 md:p-8 print:p-0">
         
-        {/* If POS is embedded, let it render directly occupying the space */}
+        {/* If POS or Kitchen screen is embedded, let it render directly occupying the space */}
         {activeTab === "pos" ? (
           <POSView user={user} onLogout={onLogout} isEmbedded={true} />
+        ) : activeTab === "cocina" ? (
+          <CookView user={user} onLogout={onLogout} isEmbedded={true} />
         ) : (
           <div className="max-w-6xl mx-auto space-y-6 print:space-y-0">
             
@@ -1367,7 +1669,7 @@ export const AdminView = ({ user, onLogout }) => {
                 <h1 className="text-2xl font-bold tracking-tight uppercase font-pizza-title">
                   {tabsList.find(t => t.id === activeTab)?.label}
                 </h1>
-                <p className="text-xs text-white/50">Módulo del sistema de administración Pizza Hub</p>
+                <p className="text-xs text-white/50">Módulo del sistema de administración {businessConfig.name || "Pizza Hub"}</p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -1667,7 +1969,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: VENTAS REPORT */}
-            {activeTab === "ventas" && (
+            {activeTab === "ventas" && hasPermission(PERMISSIONS.VER_VENTAS) && (
               <div className="space-y-6">
                 {/* Export sales & General metrics */}
                 <div className="flex justify-between items-center">
@@ -1738,9 +2040,9 @@ export const AdminView = ({ user, onLogout }) => {
                         {/* Detailed Metrics */}
                         <div className="grid grid-cols-3 gap-4 pt-2">
                           {[
-                            { key: "delivery", label: "🛵 Delivery", colorClass: "bg-pizza-red text-pizza-red" },
-                            { key: "pickup", label: "🥡 Recojo", colorClass: "bg-pizza-gold text-[#ffd79b]" },
-                            { key: "dinein", label: "🍽️ Mesa", colorClass: "bg-emerald-500 text-emerald-400" }
+                            { key: "delivery", label: "🛵 Delivery", colorClass: "text-pizza-red" },
+                            { key: "pickup", label: "🥡 Recojo", colorClass: "text-pizza-gold" },
+                            { key: "dinein", label: "🍽️ Mesa", colorClass: "text-emerald-600" }
                           ].map((item) => {
                             const amt = modeCounts[item.key] || 0;
                             const pct = totalSalesRevenue > 0 ? (amt / totalSalesRevenue) * 100 : 0;
@@ -1837,13 +2139,13 @@ export const AdminView = ({ user, onLogout }) => {
                             <defs>
                               {/* Area Gradient */}
                               <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#ffd79b" stopOpacity="0.25" />
-                                <stop offset="100%" stopColor="#ffd79b" stopOpacity="0" />
+                                <stop offset="0%" stopColor="var(--chart-line-sales)" stopOpacity="0.15" />
+                                <stop offset="100%" stopColor="var(--chart-line-sales)" stopOpacity="0" />
                               </linearGradient>
                               {/* Line Gradient */}
                               <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="0%" stopColor="#ffd79b" />
-                                <stop offset="100%" stopColor="#ff9f43" />
+                                <stop offset="0%" stopColor="var(--chart-line-sales)" />
+                                <stop offset="100%" stopColor="var(--chart-line-sales-end)" />
                               </linearGradient>
                             </defs>
                             
@@ -1851,20 +2153,20 @@ export const AdminView = ({ user, onLogout }) => {
                             {yTicks.map((val, idx) => {
                               const y = (paddingTop + chartHeight) - (val / maxSales) * chartHeight;
                               return (
-                                <g key={idx} className="opacity-40">
+                                <g key={idx}>
                                   <line 
                                     x1={paddingLeft} 
                                     y1={y} 
                                     x2={width - paddingRight} 
                                     y2={y} 
-                                    stroke="rgba(255,255,255,0.05)" 
+                                    stroke="var(--chart-grid)" 
                                     strokeDasharray="4 4"
                                     strokeWidth="1"
                                   />
                                   <text 
                                     x={paddingLeft - 8} 
                                     y={y + 3} 
-                                    fill="rgba(255,255,255,0.4)" 
+                                    fill="var(--chart-text)" 
                                     fontSize="8.5" 
                                     fontWeight="bold"
                                     textAnchor="end"
@@ -1885,7 +2187,7 @@ export const AdminView = ({ user, onLogout }) => {
                                   key={idx}
                                   x={x}
                                   y={y}
-                                  fill="rgba(255,255,255,0.3)"
+                                  fill="var(--chart-text)"
                                   fontSize="8.5"
                                   fontWeight="bold"
                                   textAnchor="middle"
@@ -1917,7 +2219,7 @@ export const AdminView = ({ user, onLogout }) => {
                                 y1={paddingTop}
                                 x2={hoveredHourPoint.x}
                                 y2={paddingTop + chartHeight}
-                                stroke="rgba(255, 215, 155, 0.25)"
+                                stroke="var(--chart-hover-line)"
                                 strokeWidth="1"
                                 strokeDasharray="2 2"
                               />
@@ -1934,8 +2236,8 @@ export const AdminView = ({ user, onLogout }) => {
                                   cx={p.x}
                                   cy={p.y}
                                   r={isHovered ? 6 : 3.5}
-                                  fill={isHovered ? "#ffd79b" : "#ff9f43"}
-                                  stroke={isHovered ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.1)"}
+                                  fill={isHovered ? "var(--chart-line-sales-end)" : "var(--chart-line-sales)"}
+                                  stroke={isHovered ? "#ffffff" : "rgba(255,255,255,0.8)"}
                                   strokeWidth={isHovered ? 2 : 1}
                                   className="transition-all duration-150 cursor-pointer"
                                   onMouseEnter={() => setHoveredHourPoint(p)}
@@ -1948,7 +2250,7 @@ export const AdminView = ({ user, onLogout }) => {
                           {/* Tooltip Overlay */}
                           {hoveredHourPoint && (
                             <div 
-                              className="absolute z-10 bg-black/95 border border-white/10 rounded-xl p-2.5 shadow-2xl pointer-events-none text-xs space-y-0.5 text-left transition-all duration-100"
+                              className="absolute z-10 bg-white border border-black/10 rounded-xl p-2.5 shadow-2xl pointer-events-none text-xs space-y-0.5 text-left transition-all duration-100"
                               style={{
                                 left: `${((hoveredHourPoint.x - 20) / width) * 100}%`,
                                 top: `${((hoveredHourPoint.y - 75) / height) * 100}%`,
@@ -1956,9 +2258,9 @@ export const AdminView = ({ user, onLogout }) => {
                                 minWidth: '120px'
                               }}
                             >
-                              <p className="font-bold text-[#ffd79b]">{hoveredHourPoint.hour.toString().padStart(2, '0')}:00 hrs</p>
-                              <p className="text-white/80">Ventas: <span className="font-black text-white">{formatCurrency(hoveredHourPoint.total, businessConfig.currency)}</span></p>
-                              <p className="text-white/50 text-[10px]">Pedidos: <span className="font-bold text-white/70">{hoveredHourPoint.count}</span></p>
+                              <p className="font-bold text-pizza-gold">{hoveredHourPoint.hour.toString().padStart(2, '0')}:00 hrs</p>
+                              <p className="text-black/80 font-medium">Ventas: <span className="font-black text-black">{formatCurrency(hoveredHourPoint.total, businessConfig.currency)}</span></p>
+                              <p className="text-black/50 text-[10px] font-medium">Pedidos: <span className="font-bold text-black/70">{hoveredHourPoint.count}</span></p>
                             </div>
                           )}
                         </div>
@@ -1994,8 +2296,8 @@ export const AdminView = ({ user, onLogout }) => {
                             <defs>
                               {/* Bar Gradient */}
                               <linearGradient id="barGrad" x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="0%" stopColor="#ff9f43" />
-                                <stop offset="100%" stopColor="#e74c3c" />
+                                <stop offset="0%" stopColor="var(--chart-bar-start)" />
+                                <stop offset="100%" stopColor="var(--chart-bar-end)" />
                               </linearGradient>
                             </defs>
                             
@@ -2015,7 +2317,7 @@ export const AdminView = ({ user, onLogout }) => {
                                   <text
                                     x={paddingLeft - 10}
                                     y={y + barHeight / 2 + 3}
-                                    fill={isHovered ? "#ffd79b" : "rgba(255,255,255,0.7)"}
+                                    fill={isHovered ? "var(--color-pizza-gold)" : "#1a1c1c"}
                                     fontSize="9.5"
                                     fontWeight="bold"
                                     textAnchor="end"
@@ -2030,7 +2332,7 @@ export const AdminView = ({ user, onLogout }) => {
                                     y={y}
                                     width={chartWidth}
                                     height={barHeight}
-                                    fill="rgba(255,255,255,0.03)"
+                                    fill="var(--chart-bg-track)"
                                     rx="4"
                                     ry="4"
                                   />
@@ -2052,7 +2354,7 @@ export const AdminView = ({ user, onLogout }) => {
                                   <text
                                     x={paddingLeft + w + 8}
                                     y={y + barHeight / 2 + 3}
-                                    fill={isHovered ? "#ffffff" : "rgba(255,255,255,0.5)"}
+                                    fill={isHovered ? "var(--color-pizza-gold)" : "var(--chart-text)"}
                                     fontSize="9.5"
                                     fontWeight="black"
                                     textAnchor="start"
@@ -2068,7 +2370,7 @@ export const AdminView = ({ user, onLogout }) => {
                           {/* Tooltip Overlay */}
                           {hoveredProductIndex !== null && topProducts[hoveredProductIndex] && (
                             <div 
-                              className="absolute z-10 bg-black/95 border border-white/10 rounded-xl p-2.5 shadow-2xl pointer-events-none text-xs space-y-0.5 text-left transition-all duration-100"
+                              className="absolute z-10 bg-white border border-black/10 rounded-xl p-2.5 shadow-2xl pointer-events-none text-xs space-y-0.5 text-left transition-all duration-100"
                               style={{
                                 left: `${(paddingLeft + (topProducts[hoveredProductIndex].quantity / maxQty) * chartWidth) / width * 100}%`,
                                 top: `${(paddingTop + hoveredProductIndex * (barHeight + barSpacing) - 35) / height * 100}%`,
@@ -2076,9 +2378,9 @@ export const AdminView = ({ user, onLogout }) => {
                                 minWidth: '130px'
                               }}
                             >
-                              <p className="font-bold text-[#ffd79b]">{topProducts[hoveredProductIndex].name}</p>
-                              <p className="text-white/80">Cantidad: <span className="font-black text-white">{topProducts[hoveredProductIndex].quantity} uds</span></p>
-                              <p className="text-white/80">Ingresos: <span className="font-black text-emerald-400">{formatCurrency(topProducts[hoveredProductIndex].revenue, businessConfig.currency)}</span></p>
+                              <p className="font-bold text-pizza-gold">{topProducts[hoveredProductIndex].name}</p>
+                              <p className="text-black/80 font-medium">Cantidad: <span className="font-black text-black">{topProducts[hoveredProductIndex].quantity} uds</span></p>
+                              <p className="text-black/80 font-medium">Ingresos: <span className="font-black text-emerald-600">{formatCurrency(topProducts[hoveredProductIndex].revenue, businessConfig.currency)}</span></p>
                             </div>
                           )}
                         </div>
@@ -2090,7 +2392,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: RESULTADOS FINANCIEROS */}
-            {activeTab === "finanzas" && (() => {
+            {activeTab === "finanzas" && hasPermission(PERMISSIONS.VER_FINANZAS) && (() => {
               const getFinanceFilteredData = () => {
                 const now = new Date();
                 let startDate = new Date(0); // Epoch start (Histórico)
@@ -2444,12 +2746,12 @@ export const AdminView = ({ user, onLogout }) => {
                             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full min-w-[450px] overflow-visible">
                               <defs>
                                 <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="var(--color-pizza-gold)" stopOpacity="0.25"/>
-                                  <stop offset="100%" stopColor="var(--color-pizza-gold)" stopOpacity="0"/>
+                                  <stop offset="0%" stopColor="var(--chart-line-income)" stopOpacity="0.15"/>
+                                  <stop offset="100%" stopColor="var(--chart-line-income)" stopOpacity="0"/>
                                 </linearGradient>
                                 <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="var(--color-pizza-red)" stopOpacity="0.2"/>
-                                  <stop offset="100%" stopColor="var(--color-pizza-red)" stopOpacity="0"/>
+                                  <stop offset="0%" stopColor="var(--chart-line-expense)" stopOpacity="0.15"/>
+                                  <stop offset="100%" stopColor="var(--chart-line-expense)" stopOpacity="0"/>
                                 </linearGradient>
                               </defs>
 
@@ -2458,9 +2760,9 @@ export const AdminView = ({ user, onLogout }) => {
                                 const y = padTop + ratio * (svgHeight - padTop - padBot);
                                 const valLabel = (maxVal * (1 - ratio)).toFixed(0);
                                 return (
-                                  <g key={i} className="opacity-20">
-                                    <line x1={padLeft} y1={y} x2={svgWidth - padRight} y2={y} stroke="white" strokeWidth="0.5" strokeDasharray="3,3" />
-                                    <text x={padLeft - 8} y={y + 3} textAnchor="end" fill="white" className="text-[9px] font-bold">{valLabel}</text>
+                                  <g key={i}>
+                                    <line x1={padLeft} y1={y} x2={svgWidth - padRight} y2={y} stroke="var(--chart-grid)" strokeWidth="0.5" strokeDasharray="3,3" />
+                                    <text x={padLeft - 8} y={y + 3} textAnchor="end" fill="var(--chart-text)" className="text-[9px] font-bold">{valLabel}</text>
                                   </g>
                                 );
                               })}
@@ -2469,13 +2771,13 @@ export const AdminView = ({ user, onLogout }) => {
                               {incomePoints && (
                                 <>
                                   <path d={incomeAreaPath} fill="url(#incomeGrad)" />
-                                  <polyline fill="none" stroke="var(--color-pizza-gold)" strokeWidth="2.5" points={incomePoints} />
+                                  <polyline fill="none" stroke="var(--chart-line-income)" strokeWidth="2.5" points={incomePoints} />
                                 </>
                               )}
                               {expensePoints && (
                                 <>
                                   <path d={expenseAreaPath} fill="url(#expenseGrad)" />
-                                  <polyline fill="none" stroke="var(--color-pizza-red)" strokeWidth="2.5" points={expensePoints} />
+                                  <polyline fill="none" stroke="var(--chart-line-expense)" strokeWidth="2.5" points={expensePoints} />
                                 </>
                               )}
 
@@ -2486,12 +2788,12 @@ export const AdminView = ({ user, onLogout }) => {
                                 return (
                                   <g key={idx}>
                                     {/* Círculo Ingresos */}
-                                    <circle cx={inc.x} cy={inc.y} r="4" className="fill-pizza-gold stroke-pizza-dark stroke-2 hover:r-6 cursor-pointer transition-all" />
+                                    <circle cx={inc.x} cy={inc.y} r="4" className="fill-emerald-500 stroke-white stroke-2 hover:scale-150 cursor-pointer transition-all" />
                                     {/* Círculo Egresos */}
-                                    <circle cx={exp.x} cy={exp.y} r="4" className="fill-pizza-red stroke-pizza-dark stroke-2 hover:r-6 cursor-pointer transition-all" />
+                                    <circle cx={exp.x} cy={exp.y} r="4" className="fill-red-500 stroke-white stroke-2 hover:scale-150 cursor-pointer transition-all" />
                                     
                                     {/* Etiquetas del eje X */}
-                                    <text x={inc.x} y={svgHeight - 10} textAnchor="middle" fill="white" className="text-[9px] opacity-40 font-bold">
+                                    <text x={inc.x} y={svgHeight - 10} textAnchor="middle" fill="var(--chart-text)" className="text-[9px] font-bold">
                                       {b.label}
                                     </text>
                                   </g>
@@ -2506,8 +2808,8 @@ export const AdminView = ({ user, onLogout }) => {
                         )}
 
                         <div className="flex gap-4 justify-center text-[10px] mt-2 border-t border-white/5 pt-3">
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pizza-gold"></span> Ingresos (Ventas)</span>
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-pizza-red"></span> Egresos (Gastos)</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Ingresos (Ventas)</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Egresos (Gastos)</span>
                         </div>
                       </div>
 
@@ -2704,7 +3006,7 @@ export const AdminView = ({ user, onLogout }) => {
             })()}
 
             {/* TAB CONTENT: INVENTARIO CRUD */}
-            {activeTab === "inventario" && (
+            {activeTab === "inventario" && hasPermission(PERMISSIONS.VER_INVENTARIO) && (
               <div className="space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-white/50">Catálogo de Productos del Menú</h3>
@@ -2748,13 +3050,15 @@ export const AdminView = ({ user, onLogout }) => {
                       <Download size={14} className="text-[#ffd79b]" />
                       Exportar Catálogo (CSV)
                     </button>
-                    <button
-                      onClick={handleOpenAddProduct}
-                      className="flex items-center justify-center gap-1.5 bg-pizza-red hover:bg-pizza-red/90 text-xs px-4 py-2 rounded-xl font-bold cursor-pointer w-full sm:w-auto shrink-0"
-                    >
-                      <Plus size={14} />
-                      Agregar Producto
-                    </button>
+                    <HasPermission role={role} permission={PERMISSIONS.CREAR_PRODUCTO}>
+                      <button
+                        onClick={handleOpenAddProduct}
+                        className="flex items-center justify-center gap-1.5 bg-pizza-red hover:bg-pizza-red/90 text-xs px-4 py-2 rounded-xl font-bold cursor-pointer w-full sm:w-auto shrink-0"
+                      >
+                        <Plus size={14} />
+                        Agregar Producto
+                      </button>
+                    </HasPermission>
                   </div>
                 </div>
 
@@ -2816,20 +3120,24 @@ export const AdminView = ({ user, onLogout }) => {
                             )}
                           </td>
                           <td className="py-4 px-6 text-right space-x-1.5 shrink-0">
-                            <button
-                              onClick={() => handleOpenEditProduct(prod)}
-                              className="p-2 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg transition-colors cursor-pointer"
-                              title="Editar"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteProduct(prod.id)}
-                              className="p-2 bg-pizza-red/10 hover:bg-pizza-red/20 text-pizza-red rounded-lg transition-colors cursor-pointer"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            <HasPermission role={role} permission={PERMISSIONS.EDITAR_PRODUCTO}>
+                              <button
+                                onClick={() => handleOpenEditProduct(prod)}
+                                className="p-2 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg transition-colors cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                            </HasPermission>
+                            <HasPermission role={role} permission={PERMISSIONS.ELIMINAR_PRODUCTO}>
+                              <button
+                                onClick={() => handleDeleteProduct(prod.id)}
+                                className="p-2 bg-pizza-red/10 hover:bg-pizza-red/20 text-pizza-red rounded-lg transition-colors cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </HasPermission>
                           </td>
                         </tr>
                       ))}
@@ -2840,7 +3148,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: CATEGORIAS CRUD */}
-            {activeTab === "categorias" && (
+            {activeTab === "categorias" && hasPermission(PERMISSIONS.VER_INVENTARIO) && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left animate-in fade-in zoom-in-95 duration-200">
                 
                 {/* Crear/Editar Categoría Form */}
@@ -2923,8 +3231,119 @@ export const AdminView = ({ user, onLogout }) => {
               </div>
             )}
 
+            {/* TAB CONTENT: GESTION DE MESAS */}
+            {activeTab === "mesas" && hasPermission(PERMISSIONS.VER_MESAS) && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left animate-in fade-in zoom-in-95 duration-200">
+                
+                {/* Formulario de Mesa */}
+                <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-[#121212] space-y-5 h-fit">
+                  <div className="flex items-center gap-2 text-pizza-red">
+                    <Table size={18} />
+                    <h3 className="font-pizza-title font-bold text-sm uppercase">
+                      {editingTable ? "Editar Mesa" : "Gestionar Mesa"}
+                    </h3>
+                  </div>
+
+                  <form onSubmit={handleSaveTable} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Nombre / Identificador de Mesa</label>
+                      <input
+                        type="text"
+                        required
+                        value={tableNameForm}
+                        onChange={(e) => setTableNameForm(e.target.value)}
+                        placeholder="Ej. Mesa 1, Terraza 5, Barra VIP"
+                        className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-red/50"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Capacidad (Personas)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={tableCapacityForm}
+                        onChange={(e) => setTableCapacityForm(e.target.value)}
+                        placeholder="Ej. 4"
+                        className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-red/50"
+                      />
+                    </div>
+
+                    <button type="submit" className="w-full bg-pizza-red text-white text-xs font-bold py-3 rounded-xl cursor-pointer hover:bg-pizza-red/90 transition-all shadow-md shadow-pizza-red/10">
+                      {editingTable ? "Guardar Cambios" : "Agregar Mesa"}
+                    </button>
+                    {editingTable && (
+                      <button type="button" onClick={() => { setEditingTable(null); setTableNameForm(""); setTableCapacityForm("4"); }} className="w-full bg-white/5 border border-white/10 text-white text-xs font-bold py-2 rounded-xl cursor-pointer hover:bg-white/10 transition-all mt-2">
+                        Cancelar Edición
+                      </button>
+                    )}
+                  </form>
+                </div>
+
+                {/* Tabla de Mesas */}
+                <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-white/5 bg-[#121212] space-y-4">
+                  <h3 className="font-pizza-title font-bold text-sm uppercase text-white/70">Mesas y Estado de Ocupación</h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-white/5 text-[9px] uppercase font-bold text-white/40 pb-2">
+                          <th className="pb-2">ID</th>
+                          <th className="pb-2">Nombre</th>
+                          <th className="pb-2">Capacidad</th>
+                          <th className="pb-2">Estado</th>
+                          <th className="pb-2 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {tablesList.map((t) => (
+                          <tr key={t.id} className="hover:bg-white/[0.01]">
+                            <td className="py-3 font-mono text-white/50">{t.id}</td>
+                            <td className="py-3 font-semibold text-white/80">{t.name}</td>
+                            <td className="py-3 text-white/60">{t.capacity} personas</td>
+                            <td className="py-3">
+                              <button 
+                                type="button"
+                                onClick={() => handleToggleTableStatus(t)}
+                                className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase border cursor-pointer transition-colors ${
+                                  t.status === "ocupada"
+                                    ? "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/25"
+                                    : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25"
+                                }`}
+                              >
+                                {t.status === "ocupada" ? "Ocupada" : "Libre"}
+                              </button>
+                            </td>
+                            <td className="py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => { setEditingTable(t); setTableNameForm(t.name); setTableCapacityForm(t.capacity.toString()); }}
+                                className="p-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white rounded-lg transition-colors cursor-pointer mr-1.5"
+                                title="Editar"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTable(t.id, t.name)}
+                                className="p-1.5 bg-pizza-red/10 hover:bg-pizza-red/20 text-pizza-red rounded-lg transition-colors cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* TAB CONTENT: CONTACTOS CLIENTES */}
-            {activeTab === "contactos" && (
+            {activeTab === "contactos" && hasPermission(PERMISSIONS.VER_CLIENTES) && (
               <div className="space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-white/50">Directorio de Clientes Recurrentes</h3>
@@ -2994,7 +3413,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: GESTION DE PERSONAL */}
-            {activeTab === "personal" && (
+            {activeTab === "personal" && hasPermission(PERMISSIONS.VER_PERSONAL) && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left">
                 
                 {/* Form Creation */}
@@ -3040,6 +3459,34 @@ export const AdminView = ({ user, onLogout }) => {
                         <option value="cook">Cocinero / Producción</option>
                         <option value="admin">Administrador Central</option>
                       </select>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">
+                        Permisos del Personal
+                      </label>
+                      <div className="bg-[#181818] border border-white/5 rounded-xl p-3 max-h-48 overflow-y-auto space-y-2.5">
+                        {Object.entries(PERMISSIONS).map(([key, value]) => {
+                          const isChecked = staffPermissions.includes(value);
+                          return (
+                            <label key={key} className="flex items-center gap-2 text-[10px] text-white/70 hover:text-white cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setStaffPermissions(prev => [...prev, value]);
+                                  } else {
+                                    setStaffPermissions(prev => prev.filter(p => p !== value));
+                                  }
+                                }}
+                                className="accent-pizza-red cursor-pointer"
+                              />
+                              <span>{key.replace(/_/g, " ")}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <button
@@ -3090,7 +3537,18 @@ export const AdminView = ({ user, onLogout }) => {
                                 {usr.disabled ? "Suspendido" : "Activo"}
                               </span>
                             </td>
-                            <td className="py-3.5 text-right">
+                            <td className="py-3.5 text-right flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPermissionsUser(usr);
+                                  setEditingPermissionsList(usr.permissions || ROLES_PERMISSIONS[usr.role] || []);
+                                }}
+                                className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-white/10 bg-[#181818] hover:bg-white/5 text-white/80 transition-colors cursor-pointer"
+                                title="Personalizar permisos de este usuario"
+                              >
+                                Permisos 🔐
+                              </button>
                               <button
                                 onClick={() => handleToggleSuspend(usr)}
                                 className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
@@ -3111,8 +3569,88 @@ export const AdminView = ({ user, onLogout }) => {
               </div>
             )}
 
+            {/* Modal para Editar Permisos Personalizados */}
+            {editingPermissionsUser && (
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="glass-panel max-w-md w-full bg-pizza-dark border border-white/10 rounded-3xl p-6 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex justify-between items-center pb-3 border-b border-white/5">
+                    <div className="text-left">
+                      <h3 className="font-pizza-title font-bold text-sm uppercase text-white flex items-center gap-2">
+                        <span>Editar Permisos 🔐</span>
+                      </h3>
+                      <p className="text-[10px] text-white/40 mt-0.5">{editingPermissionsUser.email}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingPermissionsUser(null)}
+                      className="p-1.5 hover:bg-white/5 rounded-lg text-white/40 hover:text-white cursor-pointer transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-left">
+                    <p className="text-[11px] text-white/60 leading-relaxed">
+                      Personaliza los accesos de este usuario sobreescribiendo los permisos por defecto de su rol (<strong>{editingPermissionsUser.role}</strong>).
+                    </p>
+                    
+                    <div className="bg-black/35 border border-white/5 rounded-2xl p-4 max-h-60 overflow-y-auto space-y-3">
+                      {Object.entries(PERMISSIONS).map(([key, value]) => {
+                        const isChecked = editingPermissionsList.includes(value);
+                        return (
+                          <label key={key} className="flex items-center gap-3 text-[11px] text-white/70 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEditingPermissionsList(prev => [...prev, value]);
+                                } else {
+                                  setEditingPermissionsList(prev => prev.filter(p => p !== value));
+                                }
+                              }}
+                              className="accent-pizza-red cursor-pointer scale-105"
+                            />
+                            <span>{key.replace(/_/g, " ")}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-3 border-t border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => setEditingPermissionsUser(null)}
+                      className="flex-1 bg-[#1c1c1c] border border-white/10 hover:bg-white/5 text-white rounded-xl py-2.5 text-xs font-bold transition-all cursor-pointer text-center"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const userRef = doc(db, "users", editingPermissionsUser.uid);
+                          await updateDoc(userRef, { permissions: editingPermissionsList });
+                          await logAuditEvent(user.email, "EDITAR_PERMISOS", `Permisos editados para ${editingPermissionsUser.email}`);
+                          setEditingPermissionsUser(null);
+                          alert("Permisos actualizados con éxito.");
+                        } catch (err) {
+                          console.error("Error al actualizar permisos:", err);
+                          alert("Error al actualizar permisos.");
+                        }
+                      }}
+                      className="flex-1 bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl py-2.5 text-xs font-bold transition-all cursor-pointer text-center"
+                    >
+                      Guardar Permisos
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* TAB CONTENT: ARQUEO DE CAJA */}
-            {activeTab === "caja" && (
+            {activeTab === "caja" && hasPermission(PERMISSIONS.VER_CAJA) && (
               <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-[#121212] text-left max-w-md mx-auto space-y-6">
                 <div className="flex items-center gap-2 text-pizza-gold">
                   <DollarSign size={18} />
@@ -3223,7 +3761,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: HISTORIAL DE TURNOS */}
-            {activeTab === "turnos" && (
+            {activeTab === "turnos" && hasPermission(PERMISSIONS.VER_HISTORIAL_TURNOS) && (
               <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-[#121212] space-y-4 text-left">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
                   <h3 className="font-pizza-title font-bold text-sm uppercase text-white/70 flex items-center gap-2">
@@ -3284,7 +3822,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: AUDITORIA LOGS */}
-            {activeTab === "auditoria" && (
+            {activeTab === "auditoria" && hasPermission(PERMISSIONS.VER_AUDITORIA) && (
               <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-[#121212] space-y-4 text-left">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
                   <h3 className="font-pizza-title font-bold text-sm uppercase text-white/70 flex items-center gap-2">
@@ -3372,7 +3910,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: TIENDA ONLINE */}
-            {activeTab === "tienda" && (
+            {activeTab === "tienda" && hasPermission(PERMISSIONS.CONFIGURAR_TIENDA) && (
               <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-[#121212] text-left max-w-2xl mx-auto space-y-6">
                 <div className="flex items-center gap-2 text-emerald-400">
                   <Globe size={18} />
@@ -3453,7 +3991,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: CONFIGURACION GENERAL */}
-            {activeTab === "configuracion" && settingsForm && (
+            {activeTab === "configuracion" && hasPermission(PERMISSIONS.CONFIGURAR_TIENDA) && settingsForm && (
               <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-[#121212] text-left max-w-2xl mx-auto space-y-6">
                 <div className="flex items-center gap-2 text-pizza-gold">
                   <Settings size={18} />
@@ -3485,17 +4023,48 @@ export const AdminView = ({ user, onLogout }) => {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">URL del Logo del Negocio</label>
-                    <div className="flex gap-3 items-center">
-                      <input
-                        type="text"
-                        placeholder="Ej. https://url-de-tu-imagen.png o /pwa-192x192.png"
-                        value={settingsForm.logoUrl || ""}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, logoUrl: e.target.value }))}
-                        className="flex-1 bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
-                      />
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Logo del Negocio</label>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                      <div className="flex-1 w-full space-y-2">
+                        <div className="flex gap-3 items-center">
+                          <input
+                            type="text"
+                            placeholder="URL del logo o sube un archivo..."
+                            value={settingsForm.logoUrl || ""}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, logoUrl: e.target.value }))}
+                            className="flex-1 bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
+                          />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            className="hidden"
+                            id="logo-file-input"
+                            disabled={uploadingLogo}
+                          />
+                          <label
+                            htmlFor="logo-file-input"
+                            className="bg-[#181818] border border-white/10 hover:bg-white/5 text-xs px-4 py-2.5 rounded-xl cursor-pointer transition-colors whitespace-nowrap flex items-center gap-1.5"
+                          >
+                            {uploadingLogo ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin text-pizza-red" />
+                                Subiendo...
+                              </>
+                            ) : (
+                              <>
+                                <Download size={14} className="text-[#ffd79b] rotate-180" />
+                                Subir Archivo
+                              </>
+                            )}
+                          </label>
+                        </div>
+                        {uploadLogoError && (
+                          <p className="text-[10px] text-red-500 font-medium">{uploadLogoError}</p>
+                        )}
+                      </div>
                       {settingsForm.logoUrl && (
-                        <div className="w-10 h-10 rounded-xl bg-pizza-dark overflow-hidden shrink-0 border border-white/10 flex items-center justify-center">
+                        <div className="w-16 h-16 rounded-2xl bg-pizza-dark overflow-hidden shrink-0 border border-white/10 flex items-center justify-center shadow-lg">
                           <img 
                             src={settingsForm.logoUrl} 
                             alt="Logo preview" 
@@ -3587,7 +4156,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: SEO TAB */}
-            {activeTab === "seo" && (
+            {activeTab === "seo" && hasPermission(PERMISSIONS.CONFIGURAR_TIENDA) && (
               <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-[#121212] text-left max-w-2xl mx-auto space-y-6">
                 <div className="flex items-center gap-2 text-emerald-400">
                   <Globe size={18} />
@@ -3602,7 +4171,7 @@ export const AdminView = ({ user, onLogout }) => {
                       required
                       value={seoForm.metaTitle}
                       onChange={(e) => setSeoForm(prev => ({ ...prev, metaTitle: e.target.value }))}
-                      placeholder="Ej. 'Pizza Hub - Las mejores pizzas artesanales a la leña'"
+                      placeholder={`Ej. '${businessConfig.name || "Pizza Hub"} - Las mejores pizzas artesanales a la leña'`}
                       className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
                     />
                   </div>
@@ -3641,7 +4210,7 @@ export const AdminView = ({ user, onLogout }) => {
             )}
 
             {/* TAB CONTENT: MARKETING */}
-            {activeTab === "marketing" && (
+            {activeTab === "marketing" && hasPermission(PERMISSIONS.CONFIGURAR_TIENDA) && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-left">
                 
                 {/* Coupon Manager */}
@@ -3748,7 +4317,7 @@ export const AdminView = ({ user, onLogout }) => {
       {/* MODAL DE CRUD PRODUCTOS (INVENTARIO) */}
       {isCrudModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#181818] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-left">
+          <div className="w-full max-w-2xl bg-[#181818] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-left">
             <div className="flex items-center justify-between p-5 border-b border-white/5">
               <h3 className="font-pizza-title text-sm font-bold uppercase text-white/70">
                 {crudProduct ? `Editar Producto: ${crudProduct.name}` : "Agregar Nuevo Producto"}
@@ -3890,27 +4459,186 @@ export const AdminView = ({ user, onLogout }) => {
                 />
               </div>
 
+              {/* Selector de modo de edición (Visual vs. Texto Raw) */}
+              <div className="flex justify-between items-center border-t border-white/5 pt-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Opciones y Combos</span>
+                <div className="flex bg-black/40 rounded-xl p-0.5 border border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setEditorMode("visual")}
+                    className={`text-[9px] font-extrabold uppercase px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      editorMode === "visual"
+                        ? "bg-pizza-gold text-pizza-dark font-black"
+                        : "text-white/50 hover:text-white"
+                    }`}
+                  >
+                    Constructor Visual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorMode("text")}
+                    className={`text-[9px] font-extrabold uppercase px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      editorMode === "text"
+                        ? "bg-pizza-gold text-pizza-dark font-black"
+                        : "text-white/50 hover:text-white"
+                    }`}
+                  >
+                    Editor Texto (Raw)
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Opciones y Tamaños (Formato Grupo: val1, val2)</label>
-                  <textarea
-                    value={crudForm.optionsText}
-                    onChange={(e) => setCrudForm(prev => ({ ...prev, optionsText: e.target.value }))}
-                    placeholder="Tamaño: Mediana, Familiar (+ $5.00)&#10;Masa: Tradicional, Fina, Borde Queso"
-                    rows="3"
-                    className="w-full bg-[#101010] border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono leading-relaxed"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Ítems de Combo (Una opción por línea)</label>
-                  <textarea
-                    value={crudForm.comboItemsText}
-                    onChange={(e) => setCrudForm(prev => ({ ...prev, comboItemsText: e.target.value }))}
-                    placeholder="Pizza 1 (Margherita/Diavola)&#10;Pizza 2 (Margherita/Diavola)&#10;Bebida 1.5L"
-                    rows="3"
-                    className="w-full bg-[#101010] border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono leading-relaxed"
-                  />
-                </div>
+                {editorMode === "visual" ? (
+                  <>
+                    {/* Opciones y Tamaños (Constructor Visual) */}
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Opciones y Tamaños</label>
+                      <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                        {visualOptions.map((group) => (
+                          <div key={group.id} className="bg-pizza-dark/40 border border-white/5 rounded-2xl p-3.5 space-y-2 text-left">
+                            <div className="flex justify-between items-center gap-2">
+                              <input
+                                type="text"
+                                value={group.name}
+                                onChange={(e) => handleUpdateGroupName(group.id, e.target.value)}
+                                className="bg-transparent border-b border-white/10 focus:border-pizza-gold text-[11px] font-black uppercase text-[#ffd79b] w-2/3 focus:outline-none py-0.5"
+                                placeholder="Grupo (ej. Tamaño)"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOptionGroup(group.id)}
+                                className="text-white/30 hover:text-pizza-red p-1 rounded-lg hover:bg-white/5 transition-colors"
+                                title="Eliminar Grupo"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                            
+                            {/* Pills container */}
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {group.values.map((val, valIdx) => (
+                                <span key={valIdx} className="inline-flex items-center gap-1 bg-white/5 border border-white/5 text-[10px] text-white/80 px-2.5 py-1 rounded-full font-medium">
+                                  {val}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveOptionValue(group.id, valIdx)}
+                                    className="text-white/40 hover:text-white font-bold ml-0.5 text-xs hover:scale-110 active:scale-95 transition-all"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                              {group.values.length === 0 && (
+                                <span className="text-[10px] text-white/20 italic">Sin opciones asignadas</span>
+                              )}
+                            </div>
+
+                            {/* Input para agregar opción rápida */}
+                            <div className="flex gap-1.5 mt-2">
+                              <input
+                                type="text"
+                                placeholder="Ej. Mediana o Familiar (+ $5.00)"
+                                className="flex-1 bg-[#101010] border border-white/5 rounded-lg px-2.5 py-1 text-[10px] text-white focus:outline-none"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddOptionValue(group.id, e.target.value);
+                                    e.target.value = "";
+                                  }
+                                }}
+                                id={`new-opt-val-${group.id}`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`new-opt-val-${group.id}`);
+                                  if (input) {
+                                    handleAddOptionValue(group.id, input.value);
+                                    input.value = "";
+                                  }
+                                }}
+                                className="bg-pizza-gold/20 text-[#ffd79b] hover:bg-pizza-gold/30 text-[10px] px-2.5 py-1 rounded-lg font-bold"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        <button
+                          type="button"
+                          onClick={handleAddOptionGroup}
+                          className="w-full border border-dashed border-white/10 hover:border-white/25 text-white/50 hover:text-white/80 text-[10px] py-2 rounded-xl transition-all font-bold flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Plus size={12} />
+                          Agregar Grupo de Opciones
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Ítems de Combo (Constructor Visual) */}
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Ítems del Combo</label>
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {visualCombos.map((combo) => (
+                          <div key={combo.id} className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              value={combo.value}
+                              onChange={(e) => handleUpdateComboItem(combo.id, e.target.value)}
+                              className="flex-1 bg-[#101010] border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-gold/50"
+                              placeholder="Ej. Pizza 1 (Margherita/Diavola)"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveComboItem(combo.id)}
+                              className="text-white/30 hover:text-pizza-red p-2.5 rounded-xl hover:bg-white/5 transition-colors shrink-0"
+                              title="Eliminar Ítem"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        {visualCombos.length === 0 && (
+                          <p className="text-[10px] text-white/20 italic text-center py-6">Este producto no es un combo</p>
+                        )}
+                        
+                        <button
+                          type="button"
+                          onClick={handleAddComboItem}
+                          className="w-full border border-dashed border-white/10 hover:border-white/25 text-white/50 hover:text-white/80 text-[10px] py-2 rounded-xl transition-all font-bold flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Plus size={12} />
+                          Agregar Ítem al Combo
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Opciones y Tamaños (Formato Grupo: val1, val2)</label>
+                      <textarea
+                        value={crudForm.optionsText}
+                        onChange={(e) => setCrudForm(prev => ({ ...prev, optionsText: e.target.value }))}
+                        placeholder="Tamaño: Mediana, Familiar (+ $5.00)&#10;Masa: Tradicional, Fina, Borde Queso"
+                        rows="6"
+                        className="w-full bg-[#101010] border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono leading-relaxed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Ítems de Combo (Una opción por línea)</label>
+                      <textarea
+                        value={crudForm.comboItemsText}
+                        onChange={(e) => setCrudForm(prev => ({ ...prev, comboItemsText: e.target.value }))}
+                        placeholder="Pizza 1 (Margherita/Diavola)&#10;Pizza 2 (Margherita/Diavola)&#10;Bebida 1.5L"
+                        rows="6"
+                        className="w-full bg-[#101010] border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono leading-relaxed"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="pt-4 border-t border-white/5 flex justify-end gap-2">

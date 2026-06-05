@@ -4,7 +4,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, 
 import { logoutUser } from "../firebase/auth";
 import { LogOut, ClipboardList, Check, Loader2, Clock, Volume2, VolumeX, Play } from "lucide-react";
 
-export const CookView = ({ user, onLogout }) => {
+export const CookView = ({ user, onLogout, isEmbedded = false }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeTick, setTimeTick] = useState(0);
@@ -126,13 +126,14 @@ export const CookView = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-pizza-dark text-white flex flex-col">
+    <div className={isEmbedded ? "w-full h-full bg-pizza-dark text-white flex flex-col" : "min-h-screen bg-pizza-dark text-white flex flex-col"}>
       {/* Cabecera Cocina */}
-      <header className="bg-pizza-charcoal border-b border-white/5 px-6 py-4 flex justify-between items-center sticky top-0 z-30">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">👨‍🍳</span>
+      <header className={`bg-pizza-charcoal border-b border-white/5 px-6 py-4 flex flex-wrap justify-between items-center sticky top-0 z-30 gap-3 ${isEmbedded ? "md:px-4 py-3" : ""}`}>
+        {/* Ocultar sección de título/logo si es embedded y en móvil, o mostrarla compacta en desktop */}
+        <div className={`items-center gap-3 ${isEmbedded ? "hidden md:flex" : "flex"}`}>
+          <span className="text-2xl md:text-3xl">👨‍🍳</span>
           <div>
-            <h1 className="font-pizza-title text-xl font-bold flex items-center gap-2">
+            <h1 className="font-pizza-title text-base md:text-xl font-bold flex items-center gap-2">
               Pantalla de Cocina (KDS)
               <span className="bg-[#ffd79b]/10 text-[#ffd79b] border border-[#ffd79b]/20 text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">
                 Kitchen
@@ -142,36 +143,48 @@ export const CookView = ({ user, onLogout }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Mostrar título compacto en móvil si es embedded */}
+        {isEmbedded && (
+          <div className="flex md:hidden items-center gap-1.5">
+            <span className="text-xl">👨‍🍳</span>
+            <span className="font-pizza-title text-sm font-bold">Cocina KDS</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 md:gap-3">
           <button
             onClick={() => setMuted(!muted)}
-            className={`flex items-center gap-1.5 border text-xs font-bold py-2 px-3.5 rounded-xl transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 border text-[10px] md:text-xs font-bold py-1.5 px-2.5 md:py-2 md:px-3.5 rounded-xl transition-all cursor-pointer ${
               muted 
                 ? "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20" 
                 : "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20"
             }`}
             title={muted ? "Activar sonido de alerta" : "Silenciar alertas"}
           >
-            {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-            {muted ? "Alertas Silenciadas" : "Alertas Activas"}
+            {muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            <span className="hidden sm:inline">{muted ? "Alertas Silenciadas" : "Alertas Activas"}</span>
+            <span className="sm:hidden">{muted ? "Silenciado" : "Activo"}</span>
           </button>
 
           <button
             onClick={playKitchenAlert}
-            className="flex items-center gap-1.5 bg-[#ffd79b]/10 border border-[#ffd79b]/20 hover:bg-[#ffd79b]/20 text-[#ffd79b] text-xs font-bold py-2 px-3.5 rounded-xl transition-all cursor-pointer animate-pulse"
+            className="flex items-center gap-1.5 bg-[#ffd79b]/10 border border-[#ffd79b]/20 hover:bg-[#ffd79b]/20 text-[#ffd79b] text-[10px] md:text-xs font-bold py-1.5 px-2.5 md:py-2 md:px-3.5 rounded-xl transition-all cursor-pointer animate-pulse"
             title="Probar sonido y activar audio del navegador"
           >
-            <Play size={12} fill="currentColor" />
-            Probar Sonido
+            <Play size={10} fill="currentColor" />
+            <span className="hidden sm:inline">Probar Sonido</span>
+            <span className="sm:hidden">Probar</span>
           </button>
 
-          <button
-            onClick={handleLogoutClick}
-            className="flex items-center gap-1.5 bg-pizza-red/10 border border-pizza-red/20 hover:bg-pizza-red/20 text-pizza-red text-xs font-bold py-2 px-4 rounded-xl transition-all cursor-pointer"
-          >
-            <LogOut size={14} />
-            Cerrar Sesión
-          </button>
+          {!isEmbedded && (
+            <button
+              onClick={handleLogoutClick}
+              className="flex items-center gap-1.5 bg-pizza-red/10 border border-pizza-red/20 hover:bg-pizza-red/20 text-pizza-red text-xs font-bold py-2 px-4 rounded-xl transition-all cursor-pointer"
+            >
+              <LogOut size={14} />
+              Cerrar Sesión
+            </button>
+          )}
         </div>
       </header>
 

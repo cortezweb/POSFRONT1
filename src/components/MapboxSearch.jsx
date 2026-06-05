@@ -340,7 +340,7 @@ export const MapboxSearch = ({ onAddressSelected }) => {
         .setLngLat([origin.lng, origin.lat])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<div style="color:#000;font-family:sans-serif;font-size:12px;font-weight:bold;padding:2px;">🍕 Pizza Hub (Origen)</div>`
+            `<div style="color:#000;font-family:sans-serif;font-size:12px;font-weight:bold;padding:2px;">🍕 ${businessConfigRef.current?.name || "Pizza Hub"} (Origen)</div>`
           )
         )
         .addTo(map);

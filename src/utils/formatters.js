@@ -92,3 +92,55 @@ export const formatWhatsAppMessage = (order, totals, config) => {
 
   return encodeURIComponent(message);
 };
+
+/**
+ * Analiza un ítem de combo para determinar si contiene opciones elegibles entre paréntesis.
+ * Ejemplo: "Pizza 1 (Margherita/Diavola)" -> { name: "Pizza 1", options: ["Margherita", "Diavola"], isSelection: true }
+ * Ejemplo: "Bebida 1.5L" -> { name: "Bebida 1.5L", options: [], isSelection: false }
+ */
+export const parseComboItem = (itemText) => {
+  if (!itemText) return { name: "", options: [], isSelection: false };
+  const regex = /^([^(]+)\(([^)]+)\)$/;
+  const match = itemText.trim().match(regex);
+  if (match) {
+    const name = match[1].trim();
+    const optionsString = match[2];
+    // Split by '/' or ','
+    const options = optionsString.split(/[/,]+/).map(o => o.trim()).filter(Boolean);
+    return { name, options, isSelection: options.length > 0 };
+  }
+  return { name: itemText.trim(), options: [], isSelection: false };
+};
+
+/**
+ * Obtiene el ajuste de precio de un valor de opción.
+ * Ejemplo: "Familiar (+ $5.00)" o "Familiar (+$5.00)" o "Mediana (+3.00)" -> 5.00 o 3.00
+ */
+export const getOptionPriceAdjustment = (optionValue) => {
+  if (!optionValue) return 0;
+  const regex = /\(\+\s*\$?\s*([0-9.]+)\)/;
+  const match = optionValue.match(regex);
+  if (match) {
+    const val = parseFloat(match[1]);
+    return isNaN(val) ? 0 : val;
+  }
+  return 0;
+};
+
+/**
+ * Calcula el precio final de un producto teniendo en cuenta el descuento y el ajuste de precio de las opciones seleccionadas.
+ */
+export const getProductPriceWithExtras = (product, optsSelected) => {
+  if (!product) return 0;
+  let optionExtra = 0;
+  if (product.options && optsSelected) {
+    Object.entries(optsSelected).forEach(([groupName, selectedVal]) => {
+      optionExtra += getOptionPriceAdjustment(selectedVal);
+    });
+  }
+  const discount = product.discount || 0;
+  const baseWithExtra = product.price + optionExtra;
+  return discount > 0 
+    ? baseWithExtra * (1 - discount / 100) 
+    : baseWithExtra;
+};
