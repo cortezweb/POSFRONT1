@@ -85,7 +85,7 @@ function App() {
     if (currentPath === "#/login") {
       if (loadingAuth) {
         return (
-          <div className="min-h-screen bg-pizza-charcoal text-white flex flex-col items-center justify-center gap-3">
+          <div className="min-h-screen bg-pizza-dark text-white flex flex-col items-center justify-center gap-3">
             <Loader2 size={32} className="animate-spin text-pizza-red" />
             <span className="text-sm font-semibold tracking-wide text-white/50">Cargando credenciales...</span>
           </div>
@@ -97,7 +97,7 @@ function App() {
           return <AdminView user={user} role={role} permissions={permissions} onLogout={handleLogout} />;
         } else {
           return (
-            <div className="min-h-screen bg-pizza-charcoal text-white flex flex-col items-center justify-center p-6 text-center">
+            <div className="min-h-screen bg-pizza-dark text-white flex flex-col items-center justify-center p-6 text-center">
               <span className="text-4xl mb-4">⚠️</span>
               <h2 className="text-xl font-bold mb-2">Usuario sin Rol Configurado</h2>
               <p className="text-sm text-white/60 max-w-sm mb-6">

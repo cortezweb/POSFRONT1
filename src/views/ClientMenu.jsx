@@ -422,22 +422,22 @@ export const ClientMenu = () => {
 
   if (orderSuccess) {
     return (
-      <div className="min-h-screen bg-pizza-charcoal text-white flex items-center justify-center p-4">
-        <div className="w-full max-w-lg glass-panel rounded-3xl p-8 text-center border border-white/10 shadow-2xl relative overflow-hidden">
+      <div className="min-h-screen bg-pizza-charcoal text-pizza-dark flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-white border border-gray-200 rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 bg-[#ffd79b]/10 rounded-full blur-3xl pointer-events-none" />
           
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-pizza-gold/10 text-pizza-gold mb-6 border border-pizza-gold/20">
             <Check size={40} className="animate-bounce" />
           </div>
 
-          <h2 className="font-pizza-title text-3xl font-bold text-white mb-2">¡Pedido Recibido!</h2>
-          <p className="text-white/70 text-sm mb-4">
+          <h2 className="font-pizza-title text-3xl font-bold text-pizza-dark mb-2">¡Pedido Recibido!</h2>
+          <p className="text-gray-600 text-sm mb-4">
             Tu orden <strong className="text-pizza-gold">#{orderSuccess.orderNumber}</strong> ha sido registrada y está en estado de <strong className="text-pizza-gold">Aprobación Pendiente</strong>.
           </p>
 
-          <div className="bg-pizza-dark/80 rounded-2xl p-5 border border-white/5 text-left mb-6 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Siguiente Paso Requerido:</h3>
-            <p className="text-xs text-white/80 leading-relaxed">
+          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-150 text-left mb-6 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Siguiente Paso Requerido:</h3>
+            <p className="text-xs text-gray-700 leading-relaxed">
               Para completar la sincronización y que nuestro personal comience la preparación, por favor envía el ticket por WhatsApp haciendo click en el botón de abajo.
             </p>
           </div>
@@ -447,7 +447,7 @@ export const ClientMenu = () => {
               href={orderSuccess.whatsappUrl}
               target="_blank"
               rel="noreferrer"
-              className="w-full bg-[#25d366] hover:bg-[#20ba5a] text-white py-4 px-6 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#25d366]/20"
+              className="w-full bg-[#25d366] hover:bg-[#20ba5a] text-white py-4 px-6 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#25d366]/20 keep-white"
             >
               <MessageSquare size={18} />
               Enviar Ticket por WhatsApp
@@ -458,7 +458,7 @@ export const ClientMenu = () => {
                 window.location.hash = `#/track/${orderSuccess.id}`;
                 setOrderSuccess(null);
               }}
-              className="w-full bg-pizza-red hover:bg-pizza-red/90 text-white py-3.5 px-6 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-pizza-red/20 cursor-pointer"
+              className="w-full bg-pizza-red hover:bg-pizza-red/90 text-white py-3.5 px-6 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-pizza-red/20 cursor-pointer keep-white"
             >
               Seguir Mi Pedido en Vivo 🚀
             </button>
@@ -602,8 +602,8 @@ export const ClientMenu = () => {
         {/* Sección de Cupones y Ofertas */}
         {availableCoupons.length > 0 && (
           <section className="px-6 py-4 space-y-4">
-            <h3 className="font-pizza-title text-base font-bold text-white flex items-center gap-1.5">
-              <Percent size={18} className="text-pizza-gold" />
+            <h3 className="font-pizza-title text-base font-bold text-pizza-dark flex items-center gap-1.5">
+              <Percent size={18} className="text-pizza-red" />
               Cupones Disponibles
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -625,8 +625,8 @@ export const ClientMenu = () => {
                     </div>
                     <div>
                       <span className="text-[9px] text-pizza-red font-black uppercase tracking-wider block">CUPÓN EXCLUSIVO</span>
-                      <h4 className="text-sm font-extrabold text-white">{code}</h4>
-                      <p className="text-[10px] text-white/50">{discount}% de descuento en tu total</p>
+                      <h4 className="text-sm font-extrabold text-pizza-dark">{code}</h4>
+                      <p className="text-[10px] text-gray-500">{discount}% de descuento en tu total</p>
                     </div>
                   </div>
 
@@ -672,18 +672,18 @@ export const ClientMenu = () => {
         {/* Buscador de Productos */}
         <section className="px-6 py-2">
           <div className="relative max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={16} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
               placeholder="Buscar especialidad o ingrediente..."
               value={clientSearch}
               onChange={(e) => setClientSearch(e.target.value)}
-              className="w-full bg-[#181818]/60 border border-white/5 focus:border-pizza-gold/40 focus:ring-1 focus:ring-pizza-gold/40 text-white rounded-2xl pl-11 pr-10 py-3 text-sm placeholder-white/20 outline-none transition-all"
+              className="w-full bg-white border border-gray-200 focus:border-pizza-red focus:ring-1 focus:ring-pizza-red text-pizza-dark rounded-2xl pl-11 pr-10 py-3 text-sm placeholder-gray-400 outline-none transition-all shadow-xs"
             />
             {clientSearch && (
               <button
                 onClick={() => setClientSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80 p-1 cursor-pointer transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-pizza-dark p-1 cursor-pointer transition-colors border-0 bg-transparent"
               >
                 <X size={16} />
               </button>
@@ -693,10 +693,10 @@ export const ClientMenu = () => {
 
         <main className="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.length === 0 ? (
-            <div className="col-span-full py-16 flex flex-col items-center justify-center text-center glass-panel rounded-3xl p-8 border border-white/5">
+            <div className="col-span-full py-16 flex flex-col items-center justify-center text-center bg-white border border-gray-150 rounded-3xl p-8 shadow-sm">
               <span className="text-5xl mb-4">🍕🔍</span>
-              <h4 className="font-pizza-title text-lg font-bold text-white">No encontramos esa combinación</h4>
-              <p className="text-sm text-white/40 mt-2 max-w-sm">
+              <h4 className="font-pizza-title text-lg font-bold text-pizza-dark">No encontramos esa combinación</h4>
+              <p className="text-sm text-gray-500 mt-2 max-w-sm">
                 No hay productos en esta sección que coincidan con tu búsqueda. Prueba con otro nombre o borra el filtro.
               </p>
               <button
@@ -704,7 +704,7 @@ export const ClientMenu = () => {
                   setClientSearch("");
                   setActiveCategory("all");
                 }}
-                className="mt-6 px-6 py-3 bg-pizza-red text-white text-xs font-bold rounded-2xl hover:bg-pizza-red/90 transition-all cursor-pointer shadow-lg shadow-pizza-red/20 uppercase tracking-wider"
+                className="mt-6 px-6 py-3 bg-pizza-red text-white text-xs font-bold rounded-2xl hover:bg-pizza-red/90 transition-all cursor-pointer shadow-lg shadow-pizza-red/20 uppercase tracking-wider keep-white"
               >
                 Ver todo el menú
               </button>
@@ -718,23 +718,23 @@ export const ClientMenu = () => {
               return (
                 <div
                   key={prod.id}
-                  className={`glass-panel rounded-3xl overflow-hidden border border-white/5 hover:border-white/15 transition-all duration-300 flex flex-col group ${isOutOfStock ? "opacity-60" : ""}`}
+                  className={`bg-white rounded-3xl overflow-hidden border border-gray-150 hover:border-gray-250 hover:shadow-md transition-all duration-300 flex flex-col group ${isOutOfStock ? "opacity-60" : ""}`}
                 >
-                  <div className="relative aspect-video w-full overflow-hidden bg-pizza-dark">
+                  <div className="relative aspect-video w-full overflow-hidden bg-gray-50">
                     <img
                       src={prod.imageUrl}
                       alt={prod.name}
                       className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isOutOfStock ? "grayscale" : ""}`}
                     />
                     {hasDiscount && !isOutOfStock && (
-                      <div className="absolute top-4 left-4 bg-pizza-red text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1">
+                      <div className="absolute top-4 left-4 bg-pizza-red text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1 keep-white">
                         <Tag size={10} />
                         {prod.discount}% OFF
                       </div>
                     )}
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <span className="bg-pizza-red text-white text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
+                        <span className="bg-pizza-red text-white text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-widest shadow-lg keep-white">
                           Agotado
                         </span>
                       </div>
@@ -743,10 +743,10 @@ export const ClientMenu = () => {
 
                   <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-pizza-title text-lg font-bold text-white mb-2 group-hover:text-pizza-gold transition-colors">
+                      <h3 className="font-pizza-title text-lg font-bold text-pizza-dark mb-2 group-hover:text-pizza-red transition-colors">
                         {prod.name}
                       </h3>
-                      <p className="text-xs text-white/60 line-clamp-3 mb-4">
+                      <p className="text-xs text-gray-500 line-clamp-3 mb-4">
                         {prod.description}
                       </p>
                     </div>
@@ -755,7 +755,7 @@ export const ClientMenu = () => {
                       <div className="flex flex-col">
                         {hasDiscount ? (
                           <>
-                            <span className="text-[10px] text-white/40 line-through">
+                            <span className="text-[10px] text-gray-400 line-through">
                               {formatCurrency(prod.price, businessConfig.currency)}
                             </span>
                             <span className="text-lg font-extrabold text-pizza-gold">
@@ -776,7 +776,7 @@ export const ClientMenu = () => {
                       ) : (
                         <button
                           onClick={() => handleOpenCustomize(prod)}
-                          className="bg-[#ffd79b]/10 hover:bg-pizza-red hover:border-pizza-red border border-[#ffd79b]/20 text-[#ffd79b] hover:text-white px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer"
+                          className="bg-pizza-red/10 hover:bg-pizza-red hover:border-pizza-red border border-pizza-red/20 text-pizza-red hover:text-white px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer"
                         >
                           Agregar
                         </button>
@@ -790,10 +790,10 @@ export const ClientMenu = () => {
         </main>
 
         {/* Pie de página Desktop */}
-        <footer className="py-8 mt-12 border-t border-white/5 text-center text-xs text-white/30 space-y-2">
+        <footer className="py-8 mt-12 border-t border-gray-200 text-center text-xs text-gray-400 space-y-2">
           <p>© 2026 {businessConfig.name || "Pizza Hub"} - Todos los derechos reservados.</p>
           <p>
-            <a href="#/login" className="hover:text-pizza-gold transition-colors font-medium">
+            <a href="#/login" className="hover:text-pizza-red text-gray-500 transition-colors font-medium">
               Acceso Personal (POS / KDS / Admin)
             </a>
           </p>

@@ -388,7 +388,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const totals = getTotals();
 
   return (
-    <div className={isEmbedded ? "w-full h-[calc(100vh-80px)] overflow-hidden" : "min-h-screen bg-pizza-charcoal text-white"}>
+    <div className={isEmbedded ? "w-full h-[calc(100vh-80px)] overflow-hidden" : "min-h-screen bg-pizza-dark text-white"}>
       
       {/* -------------------- INTERFAZ DESKTOP (MD y superior) -------------------- */}
       <div className={`hidden md:flex flex-row w-full h-full ${isEmbedded ? "min-h-full" : "min-h-screen"}`}>
@@ -611,7 +611,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center bg-pizza-charcoal rounded-lg p-0.5">
+                      <div className="flex items-center bg-pizza-dark rounded-lg p-0.5 border border-white/5">
                         <button
                           onClick={() => updateQuantity(item.cartId, item.quantity - 1)}
                           className="p-0.5 hover:bg-white/5 rounded text-white/50 hover:text-white"
@@ -814,9 +814,9 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
       </div>
 
       {/* -------------------- INTERFAZ MÓVIL (Menor a MD) -------------------- */}
-      <div className={`md:hidden flex flex-col pb-16 ${isEmbedded ? "h-[calc(100vh-80px)] overflow-y-auto" : "min-h-screen bg-pizza-charcoal text-white"}`}>
+      <div className={`md:hidden flex flex-col pb-16 ${isEmbedded ? "h-[calc(100vh-80px)] overflow-y-auto" : "min-h-screen bg-pizza-dark text-white"}`}>
         {/* Cabecera Móvil del POS */}
-        <header className="sticky top-0 z-40 bg-pizza-charcoal/90 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between">
+        <header className="sticky top-0 z-40 bg-pizza-dark/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span className="text-xl">🍕</span>
             <div className="text-left">
@@ -853,7 +853,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
           {activeMobileTab === "menu" && (
             <div className="flex flex-col h-full space-y-4">
               {/* Categorías */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 shrink-0 scrollbar-none sticky top-12 bg-pizza-charcoal z-10 py-1">
+              <div className="flex gap-1.5 overflow-x-auto pb-1 shrink-0 scrollbar-none sticky top-12 bg-pizza-dark z-10 py-1">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
@@ -998,7 +998,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <div className="flex items-center bg-pizza-charcoal rounded-lg p-0.5">
+                          <div className="flex items-center bg-pizza-dark rounded-lg p-0.5 border border-white/5">
                             <button
                               onClick={() => updateQuantity(item.cartId, item.quantity - 1)}
                               className="p-0.5 hover:bg-white/5 rounded text-white/50 hover:text-white"
@@ -1375,7 +1375,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                                     className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                                       isSelected
                                         ? "bg-pizza-red text-white font-extrabold border-pizza-red"
-                                        : "bg-pizza-charcoal border-white/5 text-white/70 hover:bg-white/5"
+                                        : "bg-pizza-dark border-white/5 text-white/70 hover:bg-white/5"
                                     }`}
                                   >
                                     {opt}

@@ -32,12 +32,12 @@ export const Login = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-pizza-charcoal text-white p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-pizza-dark text-white p-4 relative overflow-hidden">
       {/* Decorative pizza elements backgrounds */}
       <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-pizza-red/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-pizza-gold/10 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-md glass-panel rounded-3xl p-8 shadow-2xl relative z-10 border border-white/10">
+      <div className="w-full max-w-md bg-[#181818]/90 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl relative z-10">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-pizza-red/20 text-pizza-red mb-4">
             <Lock size={32} />

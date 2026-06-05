@@ -507,7 +507,7 @@ export const MapboxSearch = ({ onAddressSelected }) => {
           </div>
         </div>
       ) : (
-        <div className="bg-pizza-charcoal border border-[#e8e8e8] rounded-2xl p-4 text-xs text-white/50 text-center">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 text-xs text-gray-500 text-center">
           ⚠️ Mapa no disponible o token de Mapbox inválido. Ingresa tu dirección manualmente en el buscador.
         </div>
       )}

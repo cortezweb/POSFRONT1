@@ -1941,7 +1941,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   }, [tabsList, activeTab]);
 
   return (
-    <div className="min-h-screen bg-pizza-charcoal text-white flex flex-col md:flex-row print:bg-white print:text-black">
+    <div className="min-h-screen bg-pizza-dark text-white flex flex-col md:flex-row print:bg-white print:text-black">
       
       {/* Mobile Top Header */}
       <header className="md:hidden bg-pizza-dark/95 border-b border-white/5 p-4 flex justify-between items-center z-40 shrink-0 sticky top-0">
@@ -2099,7 +2099,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       </aside>
 
       {/* Main Right Pane Content */}
-      <main className="flex-1 overflow-y-auto min-h-screen bg-pizza-charcoal p-4 md:p-8 print:p-0">
+      <main className="flex-1 overflow-y-auto min-h-screen bg-[#161616] p-4 md:p-8 print:p-0">
         
         {/* If POS or Kitchen screen is embedded, let it render directly occupying the space */}
         {activeTab === "pos" ? (

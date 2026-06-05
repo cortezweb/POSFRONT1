@@ -211,7 +211,7 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-pizza-charcoal text-white flex flex-col items-center justify-center gap-3">
+      <div className="min-h-screen bg-pizza-dark text-white flex flex-col items-center justify-center gap-3">
         <Loader2 size={36} className="animate-spin text-pizza-red" />
         <span className="text-sm text-white/50 tracking-wider">Cargando estado del pedido en vivo...</span>
       </div>
@@ -220,7 +220,7 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-pizza-charcoal text-white flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-pizza-dark text-white flex flex-col items-center justify-center p-6 text-center">
         <AlertTriangle size={48} className="text-pizza-red mb-4 animate-pulse" />
         <h2 className="text-2xl font-bold font-pizza-title mb-2">Error de Seguimiento</h2>
         <p className="text-sm text-white/60 max-w-sm mb-8">{error || "Pedido no encontrado."}</p>
@@ -385,7 +385,7 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
                           ? "bg-emerald-500 border-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]" 
                           : isActive 
                           ? "bg-pizza-red border-pizza-red text-white shadow-[0_0_12px_rgba(226,54,54,0.5)] animate-pulse" 
-                          : "bg-pizza-charcoal border-white/10 text-white/30"
+                          : "bg-pizza-dark/80 border-white/10 text-white/30"
                       }`}>
                         {isCompleted ? <CheckCircle2 size={16} /> : step.icon}
                       </div>

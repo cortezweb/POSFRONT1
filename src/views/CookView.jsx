@@ -128,7 +128,7 @@ export const CookView = ({ user, onLogout, isEmbedded = false }) => {
   return (
     <div className={isEmbedded ? "w-full h-full bg-pizza-dark text-white flex flex-col" : "min-h-screen bg-pizza-dark text-white flex flex-col"}>
       {/* Cabecera Cocina */}
-      <header className={`bg-pizza-charcoal border-b border-white/5 px-6 py-4 flex flex-wrap justify-between items-center sticky top-0 z-30 gap-3 ${isEmbedded ? "md:px-4 py-3" : ""}`}>
+      <header className={`bg-[#161616] border-b border-white/5 px-6 py-4 flex flex-wrap justify-between items-center sticky top-0 z-30 gap-3 ${isEmbedded ? "md:px-4 py-3" : ""}`}>
         {/* Ocultar sección de título/logo si es embedded y en móvil, o mostrarla compacta en desktop */}
         <div className={`items-center gap-3 ${isEmbedded ? "hidden md:flex" : "flex"}`}>
           <span className="text-2xl md:text-3xl">👨‍🍳</span>
@@ -217,7 +217,7 @@ export const CookView = ({ user, onLogout, isEmbedded = false }) => {
                   className="bg-[#181818] border-2 border-white/5 hover:border-pizza-red/35 rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between"
                 >
                   {/* Tarjeta Cabecera */}
-                  <div className="bg-pizza-charcoal border-b border-white/5 p-4 flex justify-between items-center">
+                  <div className="bg-[#1a1a1a] border-b border-white/5 p-4 flex justify-between items-center">
                     <div>
                       <span className="text-lg font-black text-[#ffd79b]">Orden #{order.orderNumber}</span>
                       <span className="block text-[10px] text-white/40">Posición: #{idx + 1} en cola</span>
@@ -272,7 +272,7 @@ export const CookView = ({ user, onLogout, isEmbedded = false }) => {
                   </div>
 
                   {/* Botón de listado */}
-                  <div className="p-4 bg-pizza-charcoal/40 border-t border-white/5">
+                  <div className="p-4 bg-[#1a1a1a]/40 border-t border-white/5">
                     <button
                       onClick={() => handleMarkReady(order.id)}
                       className="w-full bg-pizza-red hover:bg-pizza-red/90 text-white rounded-2xl py-3.5 font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-pizza-red/10"
