@@ -110,10 +110,10 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
         // Marcador Pizzería (Origen)
         const elStore = document.createElement("div");
         elStore.className = "store-map-marker";
-        elStore.innerHTML = `<div style="background-color: #e23636; border: 2px solid white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 0 10px rgba(226, 54, 54, 0.6); animation: pulse 2s infinite;">🍕</div>`;
+        elStore.innerHTML = `<div style="background-color: #e23636; border: 2px solid white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 0 10px rgba(226, 54, 54, 0.6); animation: pulse 2s infinite;">🌶️</div>`;
         new mapboxgl.Marker(elStore)
           .setLngLat([businessLocation.lng, businessLocation.lat])
-          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<h3><b>${businessConfig.name || "Pizza Hub"}</b></h3><p>Ubicación del Local</p>`))
+          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<h3><b>${businessConfig.name || "Sabor Boliviano"}</b></h3><p>Ubicación del Local</p>`))
           .addTo(map);
 
         // Marcador Cliente (Destino)
@@ -260,7 +260,7 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
       {
         key: "preparing",
         label: "En Preparación",
-        desc: "Nuestros pizzaiolos están armando tu orden a la leña.",
+        desc: "Nuestros cocineros están preparando tu orden tradicional.",
         icon: <UtensilsCrossed size={20} />
       },
       {
@@ -276,7 +276,7 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
       {
         key: "completed",
         label: "Completado",
-        desc: "¡Que disfrutes tu deliciosa pizza! ¡Buen provecho!",
+        desc: "¡Que disfrutes tu deliciosa comida! ¡Buen provecho!",
         icon: <CheckCircle2 size={20} />
       }
     ];

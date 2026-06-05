@@ -220,7 +220,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   }, []);
 
   const categoriesListToUse = categoriesList.length > 0 ? categoriesList : [
-    { id: "pizzas", name: "Pizzas" },
+    { id: "platos", name: "Platos Principales" },
     { id: "combos", name: "Combos" },
     { id: "bebidas", name: "Bebidas" },
     { id: "entradas", name: "Entradas" }
@@ -406,11 +406,11 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                     onError={(e) => { e.target.style.display = 'none'; }} 
                   />
                 ) : (
-                  <span className="text-3xl">🍕</span>
+                  <span className="text-3xl">🌶️</span>
                 )}
                 <div>
                   <h2 className="font-pizza-title text-xl font-bold">
-                    {businessConfig.name || "Pizza Hub"} POS
+                    {businessConfig.name || "Sabor Boliviano"} POS
                   </h2>
                   <span className="text-[10px] text-white/50 block">Rol: Cajero ({user.email})</span>
                 </div>
@@ -818,9 +818,9 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
         {/* Cabecera Móvil del POS */}
         <header className="sticky top-0 z-40 bg-pizza-dark/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="text-xl">🍕</span>
+            <span className="text-xl">🌶️</span>
             <div className="text-left">
-              <h2 className="font-pizza-title text-sm font-bold text-white">{businessConfig.name || "Pizza Hub"} POS</h2>
+              <h2 className="font-pizza-title text-sm font-bold text-white">{businessConfig.name || "Sabor Boliviano"} POS</h2>
               <span className="text-[9px] text-white/50 block">Rol: Cajero ({user.email})</span>
             </div>
           </div>
@@ -874,7 +874,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={14} />
                 <input
                   type="text"
-                  placeholder="Buscar pizza o producto..."
+                  placeholder="Buscar plato o bebida..."
                   value={posSearch}
                   onChange={(e) => setPosSearch(e.target.value)}
                   className="w-full bg-[#181818]/60 border border-white/5 focus:border-pizza-gold/40 focus:ring-1 focus:ring-pizza-gold/40 text-white rounded-xl pl-9 pr-8 py-2 text-xs placeholder-white/20 outline-none transition-all"
@@ -1488,7 +1488,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {pendingOrders.length === 0 ? (
                 <div className="py-20 text-center flex flex-col items-center justify-center text-white/30 space-y-3">
-                  <span className="text-4xl">🍕</span>
+                  <span className="text-4xl">🍲</span>
                   <h4 className="font-bold text-sm text-white/60">¡Bandeja al día!</h4>
                   <p className="text-xs max-w-xs leading-relaxed">
                     No hay pedidos en línea pendientes de aprobación. Los pedidos web de los clientes aparecerán aquí automáticamente.

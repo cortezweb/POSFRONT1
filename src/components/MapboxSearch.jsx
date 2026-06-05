@@ -328,19 +328,19 @@ export const MapboxSearch = ({ onAddressSelected }) => {
 
       map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
-      // Cargar marcador de la Pizzería (Origen)
+      // Cargar marcador del restaurante (Origen)
       const el = document.createElement("div");
       el.className = "pizza-map-marker";
       el.style.fontSize = "26px";
       el.style.cursor = "pointer";
       el.style.filter = "drop-shadow(0 2px 4px rgba(0,0,0,0.6))";
-      el.innerHTML = "🍕";
+      el.innerHTML = "🌶️";
 
       pizzaMarkerRef.current = new mapboxgl.Marker(el)
         .setLngLat([origin.lng, origin.lat])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<div style="color:#000;font-family:sans-serif;font-size:12px;font-weight:bold;padding:2px;">🍕 ${businessConfigRef.current?.name || "Pizza Hub"} (Origen)</div>`
+            `<div style="color:#000;font-family:sans-serif;font-size:12px;font-weight:bold;padding:2px;">🌶️ ${businessConfigRef.current?.name || "Sabor Boliviano"} (Origen)</div>`
           )
         )
         .addTo(map);

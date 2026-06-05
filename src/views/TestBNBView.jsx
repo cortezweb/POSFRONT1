@@ -35,7 +35,7 @@ import {
 export function TestBNBView() {
   // Configuración de Generación QR
   const [amount, setAmount] = useState("45.00");
-  const [gloss, setGloss] = useState("Pedido de Prueba Pizza POS");
+  const [gloss, setGloss] = useState("Pedido de Prueba Sabor Boliviano POS");
   const [expiryMinutes, setExpiryMinutes] = useState("15");
   const [customerName, setCustomerName] = useState("Carlos Mendoza");
   const [customerPhone, setCustomerPhone] = useState("70712345");
@@ -133,7 +133,7 @@ export function TestBNBView() {
     // Simular el payload de solicitud del BNB
     const generatedTxId = `bnb_tx_${Math.floor(100000 + Math.random() * 900000)}`;
     const requestPayload = {
-      merchantId: "MERCH-PIZZAHUB-001",
+      merchantId: "MERCH-SABORBOLIVIANO-001",
       terminalId: "TERM-01",
       transactionId: generatedTxId,
       amount: parseFloat(targetAmount),
@@ -141,13 +141,13 @@ export function TestBNBView() {
       gloss: targetGloss,
       expirationSeconds: parseInt(expiryMinutes) * 60,
       singleUse: true,
-      callbackUrl: "https://pizzahub.bo/api/callbacks/bnb-payment"
+      callbackUrl: "https://saborboliviano.bo/api/callbacks/bnb-payment"
     };
     setRequestJson(requestPayload);
 
     // Esperar 1 segundo para emular retraso de red
     setTimeout(() => {
-      const mockQrData = `simpleqr://payment?tx=${generatedTxId}&amount=${targetAmount}&merchant=PizzaHub&bank=BNB`;
+      const mockQrData = `simpleqr://payment?tx=${generatedTxId}&amount=${targetAmount}&merchant=SaborBoliviano&bank=BNB`;
       const responsePayload = {
         status: "SUCCESS",
         code: "00",
@@ -192,10 +192,10 @@ export function TestBNBView() {
         paymentMethod: "qr_bnb",
         items: [
           {
-            name: "Pizza Margherita Familiar",
+            name: "Pique Macho Tradicional",
             price: parseFloat(amount),
             quantity: 1,
-            optionsSelected: { Tamaño: "Familiar" }
+            optionsSelected: { Tamaño: "Mediano" }
           }
         ],
         subtotal: parseFloat(amount),
@@ -511,7 +511,7 @@ export function TestBNBView() {
                     </div>
 
                     <div className="bg-[#0d1b2a]/50 p-2.5 rounded-xl text-left text-[9px] space-y-1">
-                      <p className="text-white/60">Comercio: <strong className="text-white">PIZZA HUB & CO</strong></p>
+                      <p className="text-white/60">Comercio: <strong className="text-white">SABOR BOLIVIANO</strong></p>
                       <p className="text-white/60">Cuenta Origen: <strong className="text-white">Cta. Ahorros BNB *3912</strong></p>
                       <p className="text-white/60">Fecha: <strong className="text-white">{new Date().toLocaleDateString()}</strong></p>
                     </div>

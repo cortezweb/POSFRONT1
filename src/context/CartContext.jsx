@@ -23,27 +23,28 @@ export const CartProvider = ({ children }) => {
   
   // Parámetros del negocio leídos en tiempo real de Firestore
   const [businessConfig, setBusinessConfig] = useState({
-    currency: "USD",
-    whatsappNumber: "+51999999999",
+    name: "Sabor Boliviano",
+    currency: "BOB",
+    whatsappNumber: "+59177777777",
     vCardEnabled: true,
     yapeQrUrl: "",
     maintenanceMessage: "El local se encuentra cerrado temporalmente.",
-    tax: { taxEnabled: true, taxRate: 18, taxIncluded: false, taxName: "IGV" },
+    tax: { taxEnabled: true, taxRate: 13, taxIncluded: true, taxName: "IVA" },
     discounts: {
-      coupons: { "PIZZALOVE": 20 },
+      coupons: { "BOLIVIA50": 10, "BIENVENIDO": 5 },
       autoDiscounts: [
-        { minAmount: 500, discountPercent: 10 },
-        { minAmount: 1000, discountPercent: 15 },
-        { minAmount: 1500, discountPercent: 20 }
+        { minAmount: 150, discountPercent: 5 },
+        { minAmount: 300, discountPercent: 10 },
+        { minAmount: 500, discountPercent: 15 }
       ]
     },
     shipping: {
       shippingMode: "distance",
-      shippingCostPerKm: 1.5,
-      businessLocation: { lat: -12.046374, lng: -77.031002 }, // Lima Centro por defecto
+      shippingCostPerKm: 2.0,
+      businessLocation: { lat: -19.0429, lng: -65.2627 }, // Sucre, Bolivia por defecto
       shippingZones: []
     },
-    serviceModes: { delivery: true, pickup: true, dineIn: true, tableNumbers: 20, tableLabel: "Mesa" }
+    serviceModes: { delivery: true, pickup: true, dineIn: true, tableNumbers: 15, tableLabel: "Mesa" }
   });
 
   // Suscribirse a los cambios de configuración
@@ -61,7 +62,7 @@ export const CartProvider = ({ children }) => {
           // Actualizar meta-descripción dinámicamente para mejorar SEO en todo el proyecto
           const metaDesc = document.querySelector('meta[name="description"]');
           if (metaDesc) {
-            metaDesc.setAttribute("content", `Ordena tus pizzas y platillos favoritos en ${data.name} con nuestra VCard digital integrada. Servicio rápido de delivery, recojo o consumo en local.`);
+            metaDesc.setAttribute("content", `Ordena tus platos típicos y bebidas favoritas en ${data.name} con nuestra VCard digital integrada. Servicio rápido de delivery, recojo o consumo en local.`);
           }
         }
       }

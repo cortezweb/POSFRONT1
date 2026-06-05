@@ -32,9 +32,9 @@ export const TicketTemplate = ({ order, totals, config, printSize = "80mm" }) =>
               }}
             />
           </div>
-          <h1 className="company-name">{config?.name || "Pizza Hub & Co."}</h1>
-          <p className="company-slogan">¡El verdadero sabor a la leña!</p>
-          <p className="company-info">{config?.address || "Av. del Sabor 789, Ciudad Pizza"}</p>
+          <h1 className="company-name">{config?.name || "Sabor Boliviano"}</h1>
+          <p className="company-slogan">¡El verdadero sabor tradicional!</p>
+          <p className="company-info">{config?.address || "Av. Hernando Siles 456, Sucre, Bolivia"}</p>
           <p className="company-info">Telf/WhatsApp: {config?.whatsappNumber || "+51 999 999 999"}</p>
           {config?.tax?.taxEnabled && (
             <p className="company-tax-info">Boleta de Venta Simplificada</p>
@@ -188,13 +188,13 @@ export const TicketTemplate = ({ order, totals, config, printSize = "80mm" }) =>
 
         {/* Pie de página con QR */}
         <div className="ticket-footer">
-          <p className="thanks-msg">🍕 ¡Gracias por su preferencia! 🍕</p>
+          <p className="thanks-msg">🌶️ ¡Gracias por su preferencia! 🌶️</p>
           <p className="no-tax-note">Comprobante sin valor tributario</p>
           <div className="qr-container">
             <img src={qrUrl} alt="QR Code" className="ticket-qr" />
             <p className="qr-label">Escanea para ver nuestro menú digital</p>
           </div>
-          <p className="dev-credit">Desarrollado con ❤️ para Pizzerías</p>
+          <p className="dev-credit">Desarrollado con ❤️ para Restaurantes</p>
         </div>
       </div>
     </div>,

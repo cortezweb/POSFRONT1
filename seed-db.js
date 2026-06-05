@@ -1,13 +1,49 @@
-import { db, auth } from "../firebase/config";
-import { doc, setDoc, writeBatch, getDocs, collection } from "firebase/firestore";
-import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, setDoc, writeBatch, getDocs, collection } from "firebase/firestore";
+import { getAuth, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import fs from "fs";
 
-export const seedDatabase = async () => {
-  const status = [];
+// 1. Leer y parsear el archivo .env manualmente para Node
+if (!fs.existsSync(".env")) {
+  console.error("❌ ERROR: No se encontró el archivo .env en la raíz del proyecto.");
+  process.exit(1);
+}
+
+const envContent = fs.readFileSync(".env", "utf8");
+const config = {};
+envContent.split("\n").forEach(line => {
+  const match = line.match(/^\s*VITE_FIREBASE_([A-Z_]+)\s*=\s*(.+)$/);
+  if (match) {
+    const key = match[1];
+    let configKey = "";
+    if (key === "API_KEY") configKey = "apiKey";
+    else if (key === "AUTH_DOMAIN") configKey = "authDomain";
+    else if (key === "PROJECT_ID") configKey = "projectId";
+    else if (key === "STORAGE_BUCKET") configKey = "storageBucket";
+    else if (key === "MESSAGING_SENDER_ID") configKey = "messagingSenderId";
+    else if (key === "APP_ID") configKey = "appId";
+    
+    if (configKey) {
+      config[configKey] = match[2].trim().replace(/^['"]|['"]$/g, '');
+    }
+  }
+});
+
+console.log("Configuración Firebase cargada para el sembrador:", {
+  ...config,
+  apiKey: config.apiKey ? "***" : undefined
+});
+
+const app = initializeApp(config);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const seedDatabase = async () => {
+  console.log("Iniciando sembrado de la base de datos...");
   
   try {
     // 0. Limpiar colecciones de productos y categorías existentes
-    status.push("Limpiando productos anteriores...");
+    console.log("Limpiando productos existentes...");
     const productsSnapshot = await getDocs(collection(db, "products"));
     if (!productsSnapshot.empty) {
       const prodBatch = writeBatch(db);
@@ -15,10 +51,12 @@ export const seedDatabase = async () => {
         prodBatch.delete(doc.ref);
       });
       await prodBatch.commit();
-      status.push(`Se eliminaron ${productsSnapshot.size} productos anteriores.`);
+      console.log(`✅ Se eliminaron ${productsSnapshot.size} productos anteriores.`);
+    } else {
+      console.log("No había productos anteriores.");
     }
 
-    status.push("Limpiando categorías anteriores...");
+    console.log("Limpiando categorías existentes...");
     const categoriesSnapshot = await getDocs(collection(db, "categories"));
     if (!categoriesSnapshot.empty) {
       const catBatch = writeBatch(db);
@@ -26,7 +64,9 @@ export const seedDatabase = async () => {
         catBatch.delete(doc.ref);
       });
       await catBatch.commit();
-      status.push(`Se eliminaron ${categoriesSnapshot.size} categorías anteriores.`);
+      console.log(`✅ Se eliminaron ${categoriesSnapshot.size} categorías anteriores.`);
+    } else {
+      console.log("No había categorías anteriores.");
     }
 
     // 1. Sembrar Configuración del Negocio
@@ -36,7 +76,7 @@ export const seedDatabase = async () => {
       whatsappNumber: "+59177777777",
       address: "Av. Hernando Siles 456, Sucre, Bolivia",
       currency: "BOB",
-      logoUrl: "/pwa-192x192.png",
+      logoUrl: "",
       vCardEnabled: true,
       maintenanceMessage: "", // vacío = abierto
       tax: {
@@ -70,9 +110,9 @@ export const seedDatabase = async () => {
         tableLabel: "Mesa"
       }
     });
-    status.push("Configuración comercial boliviana sembrada correctamente.");
+    console.log("✅ Configuración comercial boliviana sembrada.");
 
-    // 1.5. Sembrar Categorías por Defecto
+    // 2. Sembrar Categorías por Defecto
     const defaultCategories = [
       { id: "platos", name: "Platos Principales" },
       { id: "entradas", name: "Sopas & Entradas" },
@@ -82,16 +122,16 @@ export const seedDatabase = async () => {
     for (const cat of defaultCategories) {
       await setDoc(doc(db, "categories", cat.id), cat);
     }
-    status.push("Categorías bolivianas sembradas.");
+    console.log("✅ Categorías bolivianas sembradas.");
 
-    // 2. Sembrar Productos del Menú (Platos bolivianos)
+    // 3. Sembrar Productos del Menú
     const products = [
       {
         id: "pique-macho",
         name: "Pique Macho Tradicional",
         description: "Clásico plato boliviano con abundante carne de res jugosa salteada, salchichas, papas fritas crujientes, rodajas de huevo cocido, cebolla morada, tomate y rodajas de locoto picante.",
         price: 45.00,
-        discount: 10, // 10% descuento individual
+        discount: 10,
         category: "platos",
         stock: 50,
         imageUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80",
@@ -178,7 +218,7 @@ export const seedDatabase = async () => {
         name: "Combo Familiar Alturas",
         description: "Un banquete boliviano: 1 Pique Macho Familiar + 2 Salteñas a elección + 2 Vasos grandes de Mocochinchi frío.",
         price: 85.00,
-        discount: 5, // 5% de descuento en el combo
+        discount: 5,
         category: "combos",
         stock: 30,
         imageUrl: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=600&q=80",
@@ -197,9 +237,9 @@ export const seedDatabase = async () => {
       batch.set(prodRef, prod);
     });
     await batch.commit();
-    status.push(`Menú sembrado con ${products.length} platos bolivianos.`);
+    console.log(`✅ Menú sembrado con ${products.length} platos bolivianos.`);
 
-    // 3. Crear usuarios de prueba (Admin, Cajero, Cocinero)
+    // 4. Crear usuarios de prueba
     const testAccounts = [
       { email: "admin@posvcard.com", password: "admin123", role: "admin" },
       { email: "cajero@posvcard.com", password: "cajero123", role: "cashier" },
@@ -208,38 +248,29 @@ export const seedDatabase = async () => {
 
     for (const acc of testAccounts) {
       try {
-        // Intentar registrar el usuario en Auth
         const cred = await createUserWithEmailAndPassword(auth, acc.email, acc.password);
         const uid = cred.user.uid;
-        
-        // Crear documento de rol en Firestore
         await setDoc(doc(db, "users", uid), {
           email: acc.email,
           role: acc.role
         });
-        
-        status.push(`Usuario creado: ${acc.email} (${acc.role})`);
+        console.log(`✅ Usuario creado: ${acc.email} (${acc.role})`);
       } catch (authErr) {
         if (authErr.code === "auth/email-already-in-use") {
-          // El usuario ya existe en Auth, pero nos aseguramos de que su rol esté en Firestore
-          status.push(`Usuario ${acc.email} ya existe. Sincronizando rol en Firestore...`);
-        } else if (authErr.code === "auth/configuration-not-found") {
-          console.error(`Error de configuración en Firebase:`, authErr);
-          status.push(`❌ Error en ${acc.email}: El proveedor de correo/contraseña no está activo en Firebase.`);
-          status.push(`👉 SOLUCIÓN: Entra a tu Firebase Console -> Authentication -> Sign-in method y HABILITA "Email/Password".`);
+          console.log(`ℹ️ Usuario ${acc.email} ya existe.`);
         } else {
-          console.error(`Error al registrar ${acc.email}:`, authErr);
-          status.push(`Error en ${acc.email}: ${authErr.message}`);
+          console.error(`❌ Error al crear usuario ${acc.email}:`, authErr.message);
         }
       }
     }
     
-    // Hacer deslogueo en caso de que haya quedado una sesión abierta de la última creación
     await signOut(auth);
-
-    return { success: true, logs: status };
+    console.log("🚀 ¡Sembrado finalizado exitosamente!");
+    process.exit(0);
   } catch (error) {
-    console.error("Error en seedDatabase:", error);
-    return { success: false, error: error.message, logs: status };
+    console.error("❌ ERROR en el sembrado:", error);
+    process.exit(1);
   }
 };
+
+seedDatabase();

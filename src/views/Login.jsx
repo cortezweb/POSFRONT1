@@ -33,7 +33,7 @@ export const Login = ({ onLoginSuccess }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-pizza-dark text-white p-4 relative overflow-hidden">
-      {/* Decorative pizza elements backgrounds */}
+      {/* Decorative background elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-pizza-red/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-pizza-gold/10 rounded-full blur-[120px] pointer-events-none" />
 
@@ -68,7 +68,7 @@ export const Login = ({ onLoginSuccess }) => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="ejemplo@pizza.com"
+                placeholder="empleado@saborboliviano.com"
                 className="w-full bg-pizza-dark/80 border border-white/10 rounded-xl px-4 py-3 pl-10 text-white placeholder-white/30 focus:outline-none focus:border-pizza-red transition-all text-sm"
               />
               <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />

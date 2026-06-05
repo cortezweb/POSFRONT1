@@ -5,6 +5,7 @@ import { compressImage } from "../utils/imageCompressor";
 import { searchAddress } from "../utils/mapboxService";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { seedDatabase } from "../utils/dbSeeder";
 
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -68,16 +69,39 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const isAdminDraggingRef = useRef(false);
   const adminSearchTimeoutRef = useRef(null);
 
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedDatabase = async () => {
+    if (!window.confirm("¿Está seguro de que desea restablecer la base de datos con el Menú Boliviano? Esto eliminará todos los productos existentes y configurará las categorías y el negocio con los valores por defecto bolivianos.")) {
+      return;
+    }
+    
+    setIsSeeding(true);
+    try {
+      const res = await seedDatabase();
+      if (res.success) {
+        alert("¡Base de datos sembrada con éxito!\n\nLogs:\n" + res.logs.join("\n"));
+        window.location.reload();
+      } else {
+        alert("Error al sembrar la base de datos:\n" + res.error + "\n\nLogs:\n" + res.logs.join("\n"));
+      }
+    } catch (err) {
+      alert("Error inesperado al sembrar: " + err.message);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const [visualOptions, setVisualOptions] = useState([]);
   const [visualCombos, setVisualCombos] = useState([]);
   const [editorMode, setEditorMode] = useState("visual"); // 'visual' | 'text'
 
   // Configuración del negocio leída para el ticket y administración
   const [businessConfig, setBusinessConfig] = useState({
-    name: "Pizza Hub & Co.",
-    whatsappNumber: "+51999999999",
-    address: "Av. del Sabor 789, Ciudad Pizza",
-    currency: "USD",
+    name: "Sabor Boliviano",
+    whatsappNumber: "+59177777777",
+    address: "Av. Hernando Siles 456, Sucre, Bolivia",
+    currency: "BOB",
     logoUrl: "",
     yapeQrUrl: "",
     vCardEnabled: true,
@@ -168,7 +192,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     discount: "0",
     cost: "",
     stock: "50",
-    category: "pizzas",
+    category: "platos",
     imageUrl: "",
     optionsText: "", // "Tamaño: Mediana, Familiar\nMasa: Tradicional, Fina"
     comboItemsText: "" // line separated
@@ -298,7 +322,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   const categoriesListToUse = useMemo(() => {
     return categoriesList.length > 0 ? categoriesList : [
-      { id: "pizzas", name: "Pizzas" },
+      { id: "platos", name: "Platos Principales" },
       { id: "combos", name: "Combos" },
       { id: "bebidas", name: "Bebidas" },
       { id: "entradas", name: "Entradas" }
@@ -390,7 +414,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       markerEl.style.fontSize = "32px";
       markerEl.style.cursor = "move";
       markerEl.style.filter = "drop-shadow(0 2px 4px rgba(0,0,0,0.6))";
-      markerEl.innerHTML = "🍕";
+      markerEl.innerHTML = "🌶️";
 
       const marker = new mapboxgl.Marker(markerEl, { draggable: true })
         .setLngLat([lng, lat])
@@ -963,7 +987,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       discount: "0",
       cost: "",
       stock: "50",
-      category: "pizzas",
+      category: "platos",
       imageUrl: "",
       optionsText: "",
       comboItemsText: ""
@@ -1161,7 +1185,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
         category: expenseForm.category,
         amount: amountNum,
         date: expenseDate,
-        createdBy: user.email || "admin@pizzahub.com"
+        createdBy: user.email || "admin@posvcard.com"
       };
       await addDoc(collection(db, "expenses"), payload);
       await logAuditEvent(user.email, "CREAR_EGRESO", `Egreso registrado: ${expenseForm.description} (${expenseForm.category}) por $${amountNum.toFixed(2)}`);
@@ -2030,10 +2054,10 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
               onError={(e) => { e.target.style.display = 'none'; }} 
             />
           ) : (
-            <span className="text-2xl">🍕</span>
+            <span className="text-2xl">🌶️</span>
           )}
           <span className="font-pizza-title font-bold text-sm">
-            {businessConfig.name || "Pizza Hub"} ({role === "admin" ? "ADM" : role === "cashier" ? "CAJ" : "COC"})
+            {businessConfig.name || "Sabor Boliviano"} ({role === "admin" ? "ADM" : role === "cashier" ? "CAJ" : "COC"})
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -2060,11 +2084,11 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                       onError={(e) => { e.target.style.display = 'none'; }} 
                     />
                   ) : (
-                    <span className="text-3xl">🍕</span>
+                    <span className="text-3xl">🌶️</span>
                   )}
                   <div>
                     <h2 className="font-pizza-title font-bold leading-none text-base">
-                      {businessConfig.name || "Pizza Hub"}
+                      {businessConfig.name || "Sabor Boliviano"}
                     </h2>
                     <span className="text-[10px] text-white/50">
                       {role === "admin" ? "Panel Administrador" : role === "cashier" ? "Panel Cajero" : "Panel Cocina"}
@@ -2123,11 +2147,11 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                 onError={(e) => { e.target.style.display = 'none'; }} 
               />
             ) : (
-              <span className="text-3xl">🍕</span>
+              <span className="text-3xl">🌶️</span>
             )}
             <div>
               <h2 className="font-pizza-title text-base font-bold flex items-center gap-1.5 leading-none">
-                {businessConfig.name || "Pizza Hub"}
+                {businessConfig.name || "Sabor Boliviano"}
                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
                   role === "admin" 
                     ? "bg-pizza-red/20 text-pizza-red border border-pizza-red/35" 
@@ -2191,7 +2215,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                 <h1 className="text-2xl font-bold tracking-tight uppercase font-pizza-title">
                   {tabsList.find(t => t.id === activeTab)?.label}
                 </h1>
-                <p className="text-xs text-white/50">Módulo del sistema de administración {businessConfig.name || "Pizza Hub"}</p>
+                <p className="text-xs text-white/50">Módulo del sistema de administración {businessConfig.name || "Sabor Boliviano"}</p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -4555,7 +4579,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                         />
                         <div className="flex items-center gap-1.5 text-[9px] text-white/40 px-1">
                           <Info size={9} className="text-pizza-gold" />
-                          <span>Puedes hacer clic en el mapa o arrastrar la pizza para fijar la ubicación exacta.</span>
+                          <span>Puedes hacer clic en el mapa o arrastrar el marcador para fijar la ubicación exacta.</span>
                         </div>
                       </div>
                     </div>
@@ -4818,7 +4842,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Título del Banner (Opcional)</label>
                           <input
                             type="text"
-                            placeholder="Ej. ¡2x1 en Pizzas Especiales! (Dejar vacío para el nombre del producto)"
+                            placeholder="Ej. ¡2x1 en Platos Típicos! (Dejar vacío para el nombre del producto)"
                             value={settingsForm.homeBannerTitle || ""}
                             onChange={(e) => setSettingsForm(prev => ({ ...prev, homeBannerTitle: e.target.value }))}
                             className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
@@ -4827,7 +4851,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Subtítulo del Banner (Opcional)</label>
                           <textarea
-                            placeholder="Ej. Pide cualquier pizza familiar y la segunda es gratis. (Dejar vacío para descripción de producto)"
+                            placeholder="Ej. Pide cualquier pique macho familiar y la segunda es gratis. (Dejar vacío para descripción de producto)"
                             value={settingsForm.homeBannerSubtitle || ""}
                             onChange={(e) => setSettingsForm(prev => ({ ...prev, homeBannerSubtitle: e.target.value }))}
                             rows="2"
@@ -5000,6 +5024,34 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                     Guardar Configuración General
                   </button>
                 </form>
+
+                <div className="border-t border-white/5 pt-5 mt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-red-500">
+                    <ShieldAlert size={16} />
+                    <h4 className="font-pizza-title font-bold text-xs uppercase">Mantenimiento de Base de Datos</h4>
+                  </div>
+                  <p className="text-[10px] text-white/50">
+                    Restablece la base de datos de Firestore cargando el menú completo de platos típicos bolivianos (Pique Macho, Silpancho, Sajta, Salteñas, bebidas, etc.), las categorías y configuraciones por defecto. Esta acción reemplazará los productos existentes.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isSeeding}
+                    onClick={handleSeedDatabase}
+                    className="w-full bg-red-600/10 border border-red-500/20 hover:bg-red-600/20 text-red-400 font-bold rounded-xl py-3 text-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isSeeding ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Restableciendo base de datos...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert size={14} />
+                        Restablecer Base de Datos (Menú Boliviano)
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -5019,7 +5071,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                       required
                       value={seoForm.metaTitle}
                       onChange={(e) => setSeoForm(prev => ({ ...prev, metaTitle: e.target.value }))}
-                      placeholder={`Ej. '${businessConfig.name || "Pizza Hub"} - Las mejores pizzas artesanales a la leña'`}
+                      placeholder={`Ej. '${businessConfig.name || "Sabor Boliviano"} - El verdadero sabor tradicional boliviano'`}
                       className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
                     />
                   </div>
@@ -5042,7 +5094,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                       type="text"
                       value={seoForm.keywords}
                       onChange={(e) => setSeoForm(prev => ({ ...prev, keywords: e.target.value }))}
-                      placeholder="pizzas, delivery de pizza, trufa, artesanal (separadas por comas)"
+                      placeholder="comida boliviana, pique macho, salteñas, delivery (separadas por comas)"
                       className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
                     />
                   </div>
@@ -5402,7 +5454,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                     required
                     value={crudForm.name}
                     onChange={(e) => setCrudForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ej. Pizza Pepperoni Real"
+                    placeholder="Ej. Pique Macho Tradicional"
                     className="w-full bg-[#101010] border border-white/5 rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
@@ -5654,7 +5706,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                               value={combo.value}
                               onChange={(e) => handleUpdateComboItem(combo.id, e.target.value)}
                               className="flex-1 bg-[#101010] border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-gold/50"
-                              placeholder="Ej. Pizza 1 (Margherita/Diavola)"
+                              placeholder="Ej. Salteña 1 (Picante/Medio/Dulce)"
                             />
                             <button
                               type="button"
@@ -5688,7 +5740,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                       <textarea
                         value={crudForm.optionsText}
                         onChange={(e) => setCrudForm(prev => ({ ...prev, optionsText: e.target.value }))}
-                        placeholder="Tamaño: Mediana, Familiar (+ $5.00)&#10;Masa: Tradicional, Fina, Borde Queso"
+                        placeholder="Tamaño: Mediano, Familiar (+ BOB 20.00)&#10;Picante: Con locoto picante, Sin locoto (Suave)"
                         rows="6"
                         className="w-full bg-[#101010] border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono leading-relaxed"
                       />
@@ -5698,7 +5750,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                       <textarea
                         value={crudForm.comboItemsText}
                         onChange={(e) => setCrudForm(prev => ({ ...prev, comboItemsText: e.target.value }))}
-                        placeholder="Pizza 1 (Margherita/Diavola)&#10;Pizza 2 (Margherita/Diavola)&#10;Bebida 1.5L"
+                        placeholder="Salteña 1 (Picante/Medio/Dulce)&#10;Salteña 2 (Picante/Medio/Dulce)&#10;Mocochinchi Frio"
                         rows="6"
                         className="w-full bg-[#101010] border border-white/5 rounded-xl p-3 text-[10px] text-white font-mono leading-relaxed"
                       />
@@ -5846,7 +5898,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                   required
                   value={eventForm.title}
                   onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Ej. Sábado de Pizza & Blues en Vivo"
+                  placeholder="Ej. Peña Folclórica & Pique Macho"
                   className="w-full bg-[#101010] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
                 />
               </div>

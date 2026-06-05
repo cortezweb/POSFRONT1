@@ -27,7 +27,7 @@ export const formatWhatsAppMessage = (order, totals, config) => {
   const taxName = config.tax?.taxName || "Impuesto";
   const taxEnabled = config.tax?.taxEnabled || false;
 
-  let message = `🍕 *NUEVO PEDIDO - ${config.name || "Pizza Hub"}* 🍕\n`;
+  let message = `🌶️ *NUEVO PEDIDO - ${config.name || "Sabor Boliviano"}* 🌶️\n`;
   message += `=============================\n`;
   message += `*Orden:* #${order.orderNumber}\n`;
   message += `*Cliente:* ${order.customerName}\n`;

@@ -247,7 +247,7 @@ export const ClientMenu = () => {
   }, []);
 
   const categoriesListToUse = categoriesList.length > 0 ? categoriesList : [
-    { id: "pizzas", name: "Pizzas" },
+    { id: "platos", name: "Platos Principales" },
     { id: "combos", name: "Combos" },
     { id: "bebidas", name: "Bebidas" },
     { id: "entradas", name: "Entradas" }
@@ -526,11 +526,11 @@ export const ClientMenu = () => {
                 onError={(e) => { e.target.style.display = 'none'; }} 
               />
             ) : (
-              <span className="text-2xl">🍕</span>
+              <span className="text-2xl">🌶️</span>
             )}
             <div>
               <h1 className="font-pizza-title text-xl font-bold text-pizza-dark leading-none">
-                {businessConfig.name || "Pizza Hub"}
+                {businessConfig.name || "Sabor Boliviano"}
               </h1>
               <span className="text-[10px] text-pizza-red font-medium uppercase tracking-wider">
                 Auténtico Sabor
@@ -740,7 +740,7 @@ export const ClientMenu = () => {
         <main className="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.length === 0 ? (
             <div className="col-span-full py-16 flex flex-col items-center justify-center text-center bg-white border border-gray-150 rounded-3xl p-8 shadow-sm">
-              <span className="text-5xl mb-4">🍕🔍</span>
+              <span className="text-5xl mb-4">🍲🔍</span>
               <h4 className="font-pizza-title text-lg font-bold text-pizza-dark">No encontramos esa combinación</h4>
               <p className="text-sm text-gray-500 mt-2 max-w-sm">
                 No hay productos en esta sección que coincidan con tu búsqueda. Prueba con otro nombre o borra el filtro.
@@ -837,7 +837,7 @@ export const ClientMenu = () => {
 
         {/* Pie de página Desktop */}
         <footer className="py-8 mt-12 border-t border-gray-200 text-center text-xs text-gray-400 space-y-2">
-          <p>© 2026 {businessConfig.name || "Pizza Hub"} - Todos los derechos reservados.</p>
+          <p>© 2026 {businessConfig.name || "Sabor Boliviano"} - Todos los derechos reservados.</p>
         </footer>
       </div>
 
@@ -1098,7 +1098,7 @@ export const ClientMenu = () => {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                 <input
                   type="text"
-                  placeholder="Buscar pizza o plato..."
+                  placeholder="Buscar plato o bebida..."
                   value={clientSearch}
                   onChange={(e) => setClientSearch(e.target.value)}
                   className="w-full bg-white border border-gray-200 focus:border-pizza-red focus:ring-1 focus:ring-pizza-red text-pizza-dark rounded-xl pl-10 pr-9 py-2.5 text-xs placeholder-gray-400 outline-none transition-all"
@@ -1117,7 +1117,7 @@ export const ClientMenu = () => {
               <div className="space-y-3.5">
                 {filteredProducts.length === 0 ? (
                   <div className="py-8 flex flex-col items-center justify-center text-center bg-white border border-gray-200 rounded-3xl p-4">
-                    <span className="text-3xl mb-2">🍕🔍</span>
+                    <span className="text-3xl mb-2">🍲🔍</span>
                     <h4 className="font-bold text-xs text-pizza-dark">Sin resultados</h4>
                     <p className="text-[10px] text-gray-500 mt-1 max-w-[200px]">
                       No encontramos coincidencias para esta búsqueda.
@@ -1202,7 +1202,7 @@ export const ClientMenu = () => {
                   <Percent size={16} className="text-pizza-red" />
                   Cupones y Ofertas
                 </h3>
-                <p className="text-[11px] text-gray-500">Aplica códigos promocionales y ahorra en tu pizza.</p>
+                <p className="text-[11px] text-gray-500">Aplica códigos promocionales y ahorra en tu orden.</p>
               </div>
 
               {/* Cupón en móvil */}
@@ -1226,7 +1226,7 @@ export const ClientMenu = () => {
                   <form onSubmit={handleApplyCoupon} className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Ej: PIZZALOVE"
+                      placeholder="Ej: BOLIVIA50"
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value)}
                       className="flex-1 bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-pizza-dark placeholder-gray-400 focus:outline-none focus:border-pizza-red focus:ring-1 focus:ring-pizza-red"
@@ -1351,7 +1351,7 @@ export const ClientMenu = () => {
               <div className="space-y-4 text-left">
                 {events.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center text-gray-400 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
-                    <span className="text-3xl mb-2">🎉🍕</span>
+                    <span className="text-3xl mb-2">🎉🍲</span>
                     <h4 className="font-bold text-xs text-pizza-dark">¡Próximamente más eventos!</h4>
                     <p className="text-[10px] text-gray-500 mt-1 max-w-[220px] leading-relaxed">
                       Estamos preparando noches especiales con música en vivo, catas y descuentos increíbles. ¡Mantente al tanto!
@@ -1889,9 +1889,9 @@ export const ClientMenu = () => {
 
               <div className="space-y-4 text-xs">
                 <div>
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-pizza-red mb-1">Pizzería</h4>
-                  <p className="text-gray-700 font-medium">{businessConfig.name || "Pizza Hub & Co."}</p>
-                  <p className="text-gray-500 mt-0.5">{businessConfig.address || "Av. del Sabor 789, Ciudad Pizza"}</p>
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-pizza-red mb-1">Restaurante</h4>
+                  <p className="text-gray-700 font-medium">{businessConfig.name || "Sabor Boliviano"}</p>
+                  <p className="text-gray-500 mt-0.5">{businessConfig.address || "Av. Hernando Siles 456, Sucre, Bolivia"}</p>
                 </div>
                 <div>
                   <h4 className="text-[10px] font-bold uppercase tracking-wider text-pizza-red mb-1">Contacto</h4>
@@ -2133,7 +2133,7 @@ export const ClientMenu = () => {
                 <div className="flex flex-col items-center justify-center py-20 text-center text-gray-450">
                   <ShoppingBag size={48} className="mb-4 text-gray-200" />
                   <p className="text-sm font-medium">Tu carrito está vacío</p>
-                  <p className="text-xs max-w-xs mt-1 text-gray-500">Explora el catálogo y agrega tus pizzas favoritas.</p>
+                  <p className="text-xs max-w-xs mt-1 text-gray-500">Explora el catálogo y agrega tus platos favoritos.</p>
                 </div>
               ) : (
                 <>
@@ -2227,7 +2227,7 @@ export const ClientMenu = () => {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="PIZZALOVE"
+                          placeholder="BOLIVIA50"
                           value={couponInput}
                           onChange={(e) => setCouponInput(e.target.value)}
                           className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-pizza-dark text-xs placeholder-gray-400 focus:outline-none focus:border-pizza-red focus:ring-1 focus:ring-pizza-red"
