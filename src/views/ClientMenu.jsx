@@ -42,6 +42,25 @@ export const ClientMenu = () => {
   const [clientSearch, setClientSearch] = useState("");
   const [tablesList, setTablesList] = useState([]);
 
+  // Acceso secreto a login (Easter Egg para personal)
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
+
+  const handleLogoClick = () => {
+    const now = Date.now();
+    if (now - lastLogoClickTime < 3000) {
+      const clicks = logoClicks + 1;
+      setLogoClicks(clicks);
+      if (clicks >= 5) {
+        window.location.hash = "#/login";
+        setLogoClicks(0);
+      }
+    } else {
+      setLogoClicks(1);
+    }
+    setLastLogoClickTime(now);
+  };
+
   // Estados para seguimiento de pedidos
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
   const [trackPhoneInput, setTrackPhoneInput] = useState("");
@@ -498,7 +517,7 @@ export const ClientMenu = () => {
       <div className="hidden md:block">
         {/* Navbar de marca */}
         <header className="sticky top-0 z-40 bg-pizza-charcoal/90 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div onClick={handleLogoClick} className="flex items-center gap-2 cursor-pointer select-none" title="Acceso Personal">
             {businessConfig.logoUrl ? (
               <img 
                 src={businessConfig.logoUrl} 
@@ -819,11 +838,6 @@ export const ClientMenu = () => {
         {/* Pie de página Desktop */}
         <footer className="py-8 mt-12 border-t border-gray-200 text-center text-xs text-gray-400 space-y-2">
           <p>© 2026 {businessConfig.name || "Pizza Hub"} - Todos los derechos reservados.</p>
-          <p>
-            <a href="#/login" className="hover:text-pizza-red text-gray-500 transition-colors font-medium">
-              Acceso Personal (POS / KDS / Admin)
-            </a>
-          </p>
         </footer>
       </div>
 
@@ -838,7 +852,10 @@ export const ClientMenu = () => {
             >
               <Menu size={20} />
             </button>
-            <span className="font-pizza-title text-base font-black uppercase tracking-wider text-pizza-red">
+            <span 
+              onClick={handleLogoClick}
+              className="font-pizza-title text-base font-black uppercase tracking-wider text-pizza-red cursor-pointer select-none"
+            >
               {businessConfig.name || "Q'Pique"}
             </span>
           </div>
@@ -1799,15 +1816,7 @@ export const ClientMenu = () => {
                 </div>
               </div>
 
-              <div className="pt-2">
-                <a
-                  href="#/login"
-                  className="flex items-center justify-center gap-2 w-full bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-2xl py-3.5 text-xs font-bold text-gray-800 transition-colors shadow-sm"
-                >
-                  <User size={14} />
-                  Acceso Personal (POS / KDS / Admin)
-                </a>
-              </div>
+              {/* Acceso personal ocultado en interfaz de cliente */}
             </div>
           )}
         </div>
@@ -1895,16 +1904,7 @@ export const ClientMenu = () => {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-100">
-              <a 
-                href="#/login" 
-                onClick={() => setInfoDrawerOpen(false)}
-                className="flex items-center justify-center gap-1.5 w-full bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl py-3 text-xs font-bold text-gray-800 transition-colors"
-              >
-                <User size={14} />
-                Acceso Personal
-              </a>
-            </div>
+            {/* Acceso personal ocultado en interfaz de cliente */}
           </div>
         </div>
       )}
