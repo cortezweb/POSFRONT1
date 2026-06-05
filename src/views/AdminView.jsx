@@ -1,7 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { db, firebaseConfig, storage } from "../firebase/config";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { compressImage } from "../utils/imageCompressor";
+import { searchAddress } from "../utils/mapboxService";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -20,8 +23,8 @@ import { CookView } from "./CookView";
 import { 
   Check, X, Printer, Settings, LogOut, Loader2, ClipboardList, MessageSquare, 
   MapPin, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, 
-  Download, Plus, Trash2, Edit2, Menu, Lock, Unlock, FileText, Search, Store,
-  TrendingUp, Tag, Table, ChefHat
+  Download, Plus, Trash2, Edit2, Menu, Lock, FileText, Search, Store,
+  TrendingUp, Tag, Table, ChefHat, Info, Calendar
 } from "lucide-react";
 
 import { usePermissions } from "../hooks/usePermissions";
@@ -47,6 +50,20 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadLogoError, setUploadLogoError] = useState("");
+  const [uploadingQr, setUploadingQr] = useState(false);
+  const [uploadQrError, setUploadQrError] = useState("");
+
+  // Estados y Refs para Mapa del Local
+  const [adminMapSearch, setAdminMapSearch] = useState("");
+  const [adminMapSuggestions, setAdminMapSuggestions] = useState([]);
+  const [loadingAdminMap, setLoadingAdminMap] = useState(false);
+  const [isAdminMapSearchOpen, setIsAdminMapSearchOpen] = useState(false);
+
+  const adminMapContainerRef = useRef(null);
+  const adminMapRef = useRef(null);
+  const adminMarkerRef = useRef(null);
+  const isAdminDraggingRef = useRef(false);
+  const adminSearchTimeoutRef = useRef(null);
 
   const [visualOptions, setVisualOptions] = useState([]);
   const [visualCombos, setVisualCombos] = useState([]);
@@ -59,6 +76,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     address: "Av. del Sabor 789, Ciudad Pizza",
     currency: "USD",
     logoUrl: "",
+    yapeQrUrl: "",
     vCardEnabled: true,
     maintenanceMessage: "",
     tax: { taxEnabled: true, taxRate: 18, taxIncluded: true, taxName: "IGV" },
@@ -113,6 +131,26 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const [cashBase, setCashBase] = useState("");
   const [actualCash, setActualCash] = useState("");
   const [actualElectronic, setActualElectronic] = useState("");
+
+  // Eventos y pre-registros
+  const [eventsList, setEventsList] = useState([]);
+  const [eventRegistrations, setEventRegistrations] = useState([]);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [crudEvent, setCrudEvent] = useState(null); // null = nuevo
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    description: "",
+    date: "",
+    time: "",
+    couponCode: "",
+    discountPercent: "15",
+    active: true,
+    bannerUrl: ""
+  });
+  const [savingEvent, setSavingEvent] = useState(false);
+  const [eventTabSubView, setEventTabSubView] = useState("lista_eventos"); // 'lista_eventos' | 'registros'
+  const [uploadingEventBanner, setUploadingEventBanner] = useState(false);
+  const [uploadEventBannerError, setUploadEventBannerError] = useState("");
 
   // CRUD de Inventario
   const [isCrudModalOpen, setIsCrudModalOpen] = useState(false);
@@ -314,6 +352,136 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     return () => unsubscribe();
   }, []);
 
+  // Lógica de Mapbox para Ubicación de la Sede/Local
+  const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+  const hasMapboxToken = mapboxToken && !mapboxToken.includes("PLACEHOLDER");
+
+  // Efecto A: Inicializar y destruir el mapa en la pestaña de tienda
+  useEffect(() => {
+    if (activeTab !== "tienda" || !hasMapboxToken || !adminMapContainerRef.current) {
+      if (adminMapRef.current) {
+        adminMapRef.current.remove();
+        adminMapRef.current = null;
+        adminMarkerRef.current = null;
+      }
+      return;
+    }
+
+    if (!storeStatusForm) return;
+
+    const lat = parseFloat(storeStatusForm.baseLat) || -12.046374;
+    const lng = parseFloat(storeStatusForm.baseLng) || -77.031002;
+
+    try {
+      mapboxgl.accessToken = mapboxToken;
+      const map = new mapboxgl.Map({
+        container: adminMapContainerRef.current,
+        style: "mapbox://styles/mapbox/dark-v11",
+        center: [lng, lat],
+        zoom: 14,
+        attributionControl: false
+      });
+
+      map.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+      // Cargar marcador
+      const markerEl = document.createElement("div");
+      markerEl.style.fontSize = "32px";
+      markerEl.style.cursor = "move";
+      markerEl.style.filter = "drop-shadow(0 2px 4px rgba(0,0,0,0.6))";
+      markerEl.innerHTML = "🍕";
+
+      const marker = new mapboxgl.Marker(markerEl, { draggable: true })
+        .setLngLat([lng, lat])
+        .addTo(map);
+
+      // Eventos del marcador
+      marker.on("dragstart", () => {
+        isAdminDraggingRef.current = true;
+      });
+
+      marker.on("dragend", () => {
+        const newLngLat = marker.getLngLat();
+        setStoreStatusForm((prev) => ({
+          ...prev,
+          baseLat: newLngLat.lat.toFixed(6),
+          baseLng: newLngLat.lng.toFixed(6)
+        }));
+        isAdminDraggingRef.current = false;
+      });
+
+      // Evento de clic en el mapa
+      map.on("click", (e) => {
+        marker.setLngLat(e.lngLat);
+        setStoreStatusForm((prev) => ({
+          ...prev,
+          baseLat: e.lngLat.lat.toFixed(6),
+          baseLng: e.lngLat.lng.toFixed(6)
+        }));
+      });
+
+      adminMapRef.current = map;
+      adminMarkerRef.current = marker;
+
+      return () => {
+        if (adminMapRef.current) {
+          adminMapRef.current.remove();
+          adminMapRef.current = null;
+          adminMarkerRef.current = null;
+        }
+      };
+    } catch (err) {
+      console.error("Error al inicializar mapa en administración:", err);
+    }
+  }, [activeTab, storeStatusForm === null]);
+
+  // Efecto B: Sincronizar cambios en los inputs numéricos con el mapa
+  useEffect(() => {
+    if (adminMapRef.current && adminMarkerRef.current && storeStatusForm && !isAdminDraggingRef.current) {
+      const lat = parseFloat(storeStatusForm.baseLat);
+      const lng = parseFloat(storeStatusForm.baseLng);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        adminMarkerRef.current.setLngLat([lng, lat]);
+        adminMapRef.current.setCenter([lng, lat]);
+      }
+    }
+  }, [storeStatusForm?.baseLat, storeStatusForm?.baseLng]);
+
+  // Manejador de búsqueda en administración
+  const handleAdminSearchChange = (e) => {
+    const val = e.target.value;
+    setAdminMapSearch(val);
+
+    if (adminSearchTimeoutRef.current) clearTimeout(adminSearchTimeoutRef.current);
+
+    if (val.trim().length < 3) {
+      setAdminMapSuggestions([]);
+      setIsAdminMapSearchOpen(false);
+      return;
+    }
+
+    setLoadingAdminMap(true);
+    setIsAdminMapSearchOpen(true);
+
+    adminSearchTimeoutRef.current = setTimeout(async () => {
+      const results = await searchAddress(val);
+      setAdminMapSuggestions(results);
+      setLoadingAdminMap(false);
+    }, 450);
+  };
+
+  const handleSelectAdminSuggestion = (suggestion) => {
+    setAdminMapSearch(suggestion.placeName);
+    setAdminMapSuggestions([]);
+    setIsAdminMapSearchOpen(false);
+
+    setStoreStatusForm((prev) => ({
+      ...prev,
+      baseLat: suggestion.center.lat.toFixed(6),
+      baseLng: suggestion.center.lng.toFixed(6)
+    }));
+  };
+
   // Suscribirse a órdenes
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
@@ -426,6 +594,36 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       setExpenses(exps);
     }, (error) => {
       console.error("Error al suscribirse a egresos:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Suscribirse a eventos
+  useEffect(() => {
+    const q = query(collection(db, "events"), orderBy("date", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const evs = [];
+      snapshot.forEach((doc) => {
+        evs.push({ id: doc.id, ...doc.data() });
+      });
+      setEventsList(evs);
+    }, (error) => {
+      console.error("Error al escuchar eventos:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Suscribirse a pre-registros
+  useEffect(() => {
+    const q = query(collection(db, "event_registrations"), orderBy("registeredAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const regs = [];
+      snapshot.forEach((doc) => {
+        regs.push({ id: doc.id, ...doc.data() });
+      });
+      setEventRegistrations(regs);
+    }, (error) => {
+      console.error("Error al escuchar pre-registros:", error);
     });
     return () => unsubscribe();
   }, []);
@@ -1155,6 +1353,79 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     }
   };
 
+  // Manejar subida de QR de Yape (Cloudinary -> Storage -> Base64)
+  const handleQrUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingQr(true);
+    setUploadQrError("");
+
+    try {
+      // 1. Comprimir imagen localmente (WebP) a tamaño adecuado para QR (600px)
+      const compressedBlob = await compressImage(file, 600, 0.8);
+      const compressedFile = new File([compressedBlob], `yape_qr_${Date.now()}.webp`, { type: "image/webp" });
+
+      // A. Intentar con Cloudinary primero
+      if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET) {
+        try {
+          const formData = new FormData();
+          formData.append("file", compressedFile);
+          formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+          const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: "POST",
+            body: formData
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            let secureUrl = data.secure_url;
+            if (secureUrl.includes("/upload/")) {
+              secureUrl = secureUrl.replace("/upload/", "/upload/f_auto,q_auto/");
+            }
+            setSettingsForm((prev) => ({ ...prev, yapeQrUrl: secureUrl }));
+            setUploadingQr(false);
+            return;
+          }
+        } catch (cloudinaryErr) {
+          console.warn("Fallo subida de QR a Cloudinary, intentando Firebase Storage...", cloudinaryErr);
+        }
+      }
+
+      // B. Intentar con Firebase Storage
+      if (storage) {
+        try {
+          const qrRef = ref(storage, `qrs/yape_qr_${Date.now()}.webp`);
+          await uploadBytes(qrRef, compressedFile);
+          const downloadURL = await getDownloadURL(qrRef);
+          setSettingsForm((prev) => ({ ...prev, yapeQrUrl: downloadURL }));
+          setUploadingQr(false);
+          return;
+        } catch (firebaseStorageErr) {
+          console.warn("Fallo subida de QR a Firebase Storage, recurriendo a Base64...", firebaseStorageErr);
+        }
+      }
+
+      // C. Fallback: Guardar como Base64 en Firestore
+      const reader = new FileReader();
+      reader.readAsDataURL(compressedBlob);
+      reader.onloadend = () => {
+        const base64data = reader.result;
+        setSettingsForm((prev) => ({ ...prev, yapeQrUrl: base64data }));
+        setUploadingQr(false);
+      };
+      reader.onerror = (readErr) => {
+        throw readErr;
+      };
+
+    } catch (err) {
+      console.error("Error al procesar subida de QR:", err);
+      setUploadQrError(err.message || "Error al procesar el archivo del QR.");
+      setUploadingQr(false);
+    }
+  };
+
   // Guardar Cambios Configuración General
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -1466,6 +1737,180 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     }
   };
 
+  // Funciones para Gestión de Eventos y Pre-registros
+  const handleSaveEvent = async (e) => {
+    e.preventDefault();
+    if (!eventForm.title.trim() || !eventForm.date || !eventForm.time) {
+      alert("El título, fecha y hora son obligatorios.");
+      return;
+    }
+    const discountVal = parseInt(eventForm.discountPercent);
+    if (isNaN(discountVal) || discountVal < 0 || discountVal > 100) {
+      alert("Porcentaje de descuento inválido (0-100).");
+      return;
+    }
+
+    setSavingEvent(true);
+    try {
+      const eventData = {
+        title: eventForm.title.trim(),
+        description: eventForm.description.trim(),
+        date: eventForm.date,
+        time: eventForm.time,
+        couponCode: eventForm.couponCode.toUpperCase().trim(),
+        discountPercent: discountVal,
+        active: eventForm.active,
+        bannerUrl: eventForm.bannerUrl.trim()
+      };
+
+      if (crudEvent) {
+        // Actualizar evento existente
+        await updateDoc(doc(db, "events", crudEvent.id), eventData);
+        await logAuditEvent(user.email, "ACTUALIZAR_EVENTO", `Evento actualizado: ${eventForm.title}`);
+      } else {
+        // Crear nuevo evento
+        await addDoc(collection(db, "events"), eventData);
+        await logAuditEvent(user.email, "CREAR_EVENTO", `Evento creado: ${eventForm.title}`);
+      }
+
+      // Si el evento tiene código de cupón y porcentaje de descuento, registrar el cupón en la config global
+      if (eventForm.couponCode.trim() && discountVal > 0) {
+        const configRef = doc(db, "config", "settings");
+        const key = `discounts.coupons.${eventForm.couponCode.toUpperCase().trim()}`;
+        await updateDoc(configRef, { [key]: discountVal });
+      }
+
+      setIsEventModalOpen(false);
+      setCrudEvent(null);
+      setEventForm({
+        title: "",
+        description: "",
+        date: "",
+        time: "",
+        couponCode: "",
+        discountPercent: "15",
+        active: true,
+        bannerUrl: ""
+      });
+      alert("Evento guardado correctamente.");
+    } catch (err) {
+      console.error("Error al guardar evento:", err);
+      alert("Error al guardar el evento.");
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  const handleDeleteEvent = async (id, title) => {
+    if (window.confirm(`¿Seguro que deseas eliminar el evento "${title}"?`)) {
+      try {
+        await deleteDoc(doc(db, "events", id));
+        await logAuditEvent(user.email, "ELIMINAR_EVENTO", `Evento eliminado: ${title}`);
+        alert("Evento eliminado.");
+      } catch (err) {
+        console.error("Error al eliminar evento:", err);
+        alert("Error al eliminar el evento.");
+      }
+    }
+  };
+
+  const handleDeleteRegistration = async (id, name) => {
+    if (window.confirm(`¿Seguro que deseas eliminar el pre-registro de ${name}?`)) {
+      try {
+        await deleteDoc(doc(db, "event_registrations", id));
+        alert("Pre-registro eliminado.");
+      } catch (err) {
+        console.error("Error al eliminar pre-registro:", err);
+      }
+    }
+  };
+
+  const handleExportRegistrationsCSV = () => {
+    const headers = ["Fecha Registro", "Evento", "Cliente", "Telefono", "Email", "Cupon"];
+    const rows = eventRegistrations.map(r => [
+      r.registeredAt ? new Date(r.registeredAt.seconds * 1000).toLocaleString() : "",
+      r.eventTitle || "",
+      r.name || "",
+      r.phone || "",
+      r.email || "",
+      r.couponCode || ""
+    ]);
+    downloadCSV("pre_registros_eventos.csv", headers, rows);
+    logAuditEvent(user.email, "EXPORTAR_CSV_REGISTROS_EVENTOS", "Exportó lista de pre-registros de eventos a CSV");
+  };
+
+  const handleEventBannerUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingEventBanner(true);
+    setUploadEventBannerError("");
+
+    try {
+      // 1. Comprimir imagen localmente (WebP) a tamaño óptimo para banner (1200px)
+      const compressedBlob = await compressImage(file, 1200, 0.8);
+      const compressedFile = new File([compressedBlob], `event_banner_${Date.now()}.webp`, { type: "image/webp" });
+
+      // A. Intentar con Cloudinary primero
+      if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET) {
+        try {
+          const formData = new FormData();
+          formData.append("file", compressedFile);
+          formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+          const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: "POST",
+            body: formData
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            let secureUrl = data.secure_url;
+            if (secureUrl.includes("/upload/")) {
+              secureUrl = secureUrl.replace("/upload/", "/upload/f_auto,q_auto/");
+            }
+            setEventForm((prev) => ({ ...prev, bannerUrl: secureUrl }));
+            setUploadingEventBanner(false);
+            return;
+          }
+        } catch (cloudinaryErr) {
+          console.warn("Fallo subida de banner a Cloudinary, intentando Firebase Storage...", cloudinaryErr);
+        }
+      }
+
+      // B. Intentar con Firebase Storage
+      if (storage) {
+        try {
+          const bannerRef = ref(storage, `events/event_banner_${Date.now()}.webp`);
+          await uploadBytes(bannerRef, compressedFile);
+          const downloadURL = await getDownloadURL(bannerRef);
+          setEventForm((prev) => ({ ...prev, bannerUrl: downloadURL }));
+          setUploadingEventBanner(false);
+          return;
+        } catch (firebaseStorageErr) {
+          console.warn("Fallo subida de banner a Firebase Storage, recurriendo a Base64...", firebaseStorageErr);
+        }
+      }
+
+      // C. Fallback: Base64 en Firestore
+      const reader = new FileReader();
+      reader.readAsDataURL(compressedBlob);
+      reader.onloadend = () => {
+        const base64data = reader.result;
+        setEventForm((prev) => ({ ...prev, bannerUrl: base64data }));
+        setUploadingEventBanner(false);
+      };
+      reader.onerror = (readErr) => {
+        throw readErr;
+      };
+
+    } catch (err) {
+      console.error("Error al procesar subida de banner:", err);
+      setUploadEventBannerError(err.message || "Error al procesar el archivo del banner.");
+      setUploadingEventBanner(false);
+    }
+  };
+
   // Definición de las pestañas del Dashboard
   const tabsList = [
     { id: "pedidos", label: "Pedidos Activos", icon: ClipboardList, permission: PERMISSIONS.VER_PEDIDOS },
@@ -1484,7 +1929,8 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     { id: "tienda", label: "Tienda Online", icon: Globe, permission: PERMISSIONS.CONFIGURAR_TIENDA },
     { id: "configuracion", label: "Configuración", icon: Settings, permission: PERMISSIONS.CONFIGURAR_TIENDA },
     { id: "seo", label: "Optimización SEO", icon: Search, permission: PERMISSIONS.CONFIGURAR_TIENDA },
-    { id: "marketing", label: "Marketing / Cupones", icon: Percent, permission: PERMISSIONS.CONFIGURAR_TIENDA }
+    { id: "marketing", label: "Marketing / Cupones", icon: Percent, permission: PERMISSIONS.CONFIGURAR_TIENDA },
+    { id: "eventos", label: "Eventos & Marketing", icon: Calendar, permission: PERMISSIONS.CONFIGURAR_TIENDA }
   ].filter(tab => hasPermission(tab.permission));
 
   // Redirigir a la primera pestaña permitida si la seleccionada actualmente no está autorizada
@@ -3955,6 +4401,86 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                     </div>
                   </div>
 
+                  {/* Mapa para ubicación de local */}
+                  {hasMapboxToken && (
+                    <div className="space-y-3 border-t border-white/5 pt-4">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40">Ubicación del Local en Mapa</label>
+                      
+                      {/* Buscador de dirección */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={adminMapSearch}
+                          onChange={handleAdminSearchChange}
+                          placeholder="Busca la dirección de tu local para ubicarlo..."
+                          className="w-full bg-[#181818] border border-white/5 rounded-xl px-4 py-2.5 pl-10 text-xs text-white placeholder-white/20 focus:outline-none focus:border-emerald-400"
+                        />
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40">
+                          {loadingAdminMap ? (
+                            <Loader2 size={14} className="animate-spin text-emerald-400" />
+                          ) : (
+                            <Search size={14} />
+                          )}
+                        </div>
+                        {adminMapSearch && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdminMapSearch("");
+                              setAdminMapSuggestions([]);
+                              setIsAdminMapSearchOpen(false);
+                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white text-xs cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Lista de sugerencias */}
+                      {isAdminMapSearchOpen && (adminMapSuggestions.length > 0 || loadingAdminMap) && (
+                        <div className="relative">
+                          <div className="absolute z-50 w-full bg-[#181818] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto overflow-x-hidden backdrop-blur-xl">
+                            {loadingAdminMap && adminMapSuggestions.length === 0 ? (
+                              <div className="p-3 text-center text-[10px] text-white/50 flex items-center justify-center gap-1.5">
+                                <Loader2 size={12} className="animate-spin text-pizza-gold" />
+                                Buscando...
+                              </div>
+                            ) : (
+                              <ul className="py-1">
+                                {adminMapSuggestions.map((suggestion) => (
+                                  <li
+                                    key={suggestion.id}
+                                    onClick={() => handleSelectAdminSuggestion(suggestion)}
+                                    className="flex items-start gap-2 px-3.5 py-2 hover:bg-white/5 cursor-pointer border-b border-white/5 last:border-0 transition-colors text-xs text-left"
+                                  >
+                                    <MapPin size={12} className="text-pizza-gold shrink-0 mt-0.5" />
+                                    <span className="text-white text-left line-clamp-2">
+                                      {suggestion.placeName}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Contenedor del mapa */}
+                      <div className="space-y-1">
+                        <div 
+                          ref={adminMapContainerRef} 
+                          className="w-full h-48 rounded-2xl border border-white/5 relative overflow-hidden bg-black/40"
+                          style={{ minHeight: "180px" }}
+                        />
+                        <div className="flex items-center gap-1.5 text-[9px] text-white/40 px-1">
+                          <Info size={9} className="text-pizza-gold" />
+                          <span>Puedes hacer clic en el mapa o arrastrar la pizza para fijar la ubicación exacta.</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Costo por KM Recorrido ({businessConfig.currency})</label>
@@ -4070,6 +4596,59 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                             alt="Logo preview" 
                             className="w-full h-full object-cover" 
                             onError={(e) => { e.target.src = '/pwa-192x192.png'; }} 
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">QR de Yape / Plin (Método de Pago)</label>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                      <div className="flex-1 w-full space-y-2">
+                        <div className="flex gap-3 items-center">
+                          <input
+                            type="text"
+                            placeholder="URL del QR o sube un archivo..."
+                            value={settingsForm.yapeQrUrl || ""}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, yapeQrUrl: e.target.value }))}
+                            className="flex-1 bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
+                          />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleQrUpload}
+                            className="hidden"
+                            id="qr-file-input"
+                            disabled={uploadingQr}
+                          />
+                          <label
+                            htmlFor="qr-file-input"
+                            className="bg-[#181818] border border-white/10 hover:bg-white/5 text-xs px-4 py-2.5 rounded-xl cursor-pointer transition-colors whitespace-nowrap flex items-center gap-1.5"
+                          >
+                            {uploadingQr ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin text-pizza-red" />
+                                Subiendo...
+                              </>
+                            ) : (
+                              <>
+                                <Download size={14} className="text-[#ffd79b] rotate-180" />
+                                Subir Archivo
+                              </>
+                            )}
+                          </label>
+                        </div>
+                        {uploadQrError && (
+                          <p className="text-[10px] text-red-500 font-medium">{uploadQrError}</p>
+                        )}
+                      </div>
+                      {settingsForm.yapeQrUrl && (
+                        <div className="w-16 h-16 rounded-2xl bg-white overflow-hidden shrink-0 border border-white/10 flex items-center justify-center shadow-lg p-1">
+                          <img 
+                            src={settingsForm.yapeQrUrl} 
+                            alt="QR preview" 
+                            className="w-full h-full object-contain" 
                           />
                         </div>
                       )}
@@ -4308,6 +4887,224 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: EVENTOS & MARKETING */}
+            {activeTab === "eventos" && hasPermission(PERMISSIONS.CONFIGURAR_TIENDA) && (
+              <div className="space-y-6">
+                {/* Selector de sub-vistas */}
+                <div className="flex justify-between items-center bg-[#121212] p-3.5 rounded-2xl border border-white/5 text-left">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEventTabSubView("lista_eventos")}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border-0 ${
+                        eventTabSubView === "lista_eventos"
+                          ? "bg-pizza-red text-white shadow-md shadow-pizza-red/15"
+                          : "bg-white/5 text-white/60 hover:text-white"
+                      }`}
+                    >
+                      Eventos Configurados
+                    </button>
+                    <button
+                      onClick={() => setEventTabSubView("registros")}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border-0 ${
+                        eventTabSubView === "registros"
+                          ? "bg-pizza-red text-white shadow-md shadow-pizza-red/15"
+                          : "bg-white/5 text-white/60 hover:text-white"
+                      }`}
+                    >
+                      Pre-registros de Asistencia ({eventRegistrations.length})
+                    </button>
+                  </div>
+                  
+                  {eventTabSubView === "lista_eventos" ? (
+                    <button
+                      onClick={() => {
+                        setCrudEvent(null);
+                        setEventForm({
+                          title: "",
+                          description: "",
+                          date: "",
+                          time: "",
+                          couponCode: "",
+                          discountPercent: "15",
+                          active: true,
+                          bannerUrl: ""
+                        });
+                        setIsEventModalOpen(true);
+                      }}
+                      className="bg-pizza-gold text-pizza-dark hover:bg-pizza-gold/95 font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md shadow-pizza-gold/15 border-0"
+                    >
+                      <Plus size={14} />
+                      Crear Evento
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleExportRegistrationsCSV}
+                      disabled={eventRegistrations.length === 0}
+                      className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/15 border-0"
+                    >
+                      <Download size={14} />
+                      Exportar CSV
+                    </button>
+                  )}
+                </div>
+
+                {/* Subvista: Lista de Eventos */}
+                {eventTabSubView === "lista_eventos" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+                    {eventsList.length === 0 ? (
+                      <div className="col-span-full py-16 text-center text-white/40 text-xs italic bg-white/5 border border-dashed border-white/10 rounded-3xl">
+                        No hay eventos creados todavía. Haz clic en "Crear Evento" para empezar.
+                      </div>
+                    ) : (
+                      eventsList.map((event) => (
+                        <div
+                          key={event.id}
+                          className={`relative rounded-3xl overflow-hidden border p-5 bg-gradient-to-br from-[#1c1c1c] to-[#121212] transition-all flex flex-col justify-between min-h-[220px] ${
+                            event.active ? "border-pizza-gold/20 shadow-md shadow-pizza-gold/5" : "border-white/5 opacity-60"
+                          }`}
+                        >
+                          {event.bannerUrl && (
+                            <div 
+                              className="absolute inset-0 bg-cover bg-center opacity-10 filter blur-xs pointer-events-none" 
+                              style={{ backgroundImage: `url(${event.bannerUrl})` }} 
+                            />
+                          )}
+                          
+                          <div className="relative space-y-2.5">
+                            <div className="flex justify-between items-center">
+                              <span className={`text-[9px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                                event.active 
+                                  ? "bg-green-500/10 text-green-400 border border-green-500/20" 
+                                  : "bg-white/10 text-white/40 border border-white/5"
+                              }`}>
+                                {event.active ? "Activo" : "Borrador"}
+                              </span>
+                              <span className="text-[10px] text-white/50 font-semibold flex items-center gap-1">
+                                📅 {event.date} | ⏰ {event.time}
+                              </span>
+                            </div>
+                            
+                            <div>
+                              <h4 className="font-pizza-title text-base font-bold text-white leading-tight">
+                                {event.title}
+                              </h4>
+                              <p className="text-[11px] text-white/60 line-clamp-3 mt-1 font-sans">
+                                {event.description}
+                              </p>
+                            </div>
+                            
+                            {event.couponCode && (
+                              <div className="bg-pizza-gold/10 border border-pizza-gold/25 rounded-xl p-2.5 flex justify-between items-center text-[10px]">
+                                <span className="text-pizza-gold font-bold">🎟️ Cupón: {event.couponCode}</span>
+                                <span className="text-white/70 font-semibold">{event.discountPercent}% Descuento</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="relative mt-4 pt-3.5 border-t border-white/5 flex justify-end gap-2 shrink-0">
+                            <button
+                              onClick={() => {
+                                setCrudEvent(event);
+                                setEventForm({
+                                  title: event.title,
+                                  description: event.description,
+                                  date: event.date,
+                                  time: event.time,
+                                  couponCode: event.couponCode || "",
+                                  discountPercent: event.discountPercent || "15",
+                                  active: event.active !== false,
+                                  bannerUrl: event.bannerUrl || ""
+                                });
+                                setIsEventModalOpen(true);
+                              }}
+                              className="bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors border-0 cursor-pointer"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEvent(event.id, event.title)}
+                              className="bg-pizza-red/10 border border-pizza-red/20 text-pizza-red hover:bg-pizza-red/20 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer border-0"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Subvista: Pre-registros */}
+                {eventTabSubView === "registros" && (
+                  <div className="glass-panel p-5 rounded-3xl border border-white/5 bg-[#121212] overflow-hidden text-left space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-white/55 font-pizza-title">Lista General de Clientes Pre-registrados</h4>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/20">
+                      <table className="w-full text-xs text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/5 bg-white/5 text-white/40 uppercase text-[9px] tracking-wider font-extrabold">
+                            <th className="px-4 py-3">Fecha</th>
+                            <th className="px-4 py-3">Evento</th>
+                            <th className="px-4 py-3">Cliente</th>
+                            <th className="px-4 py-3">WhatsApp / Teléfono</th>
+                            <th className="px-4 py-3">Email</th>
+                            <th className="px-4 py-3">Cupón</th>
+                            <th className="px-4 py-3 text-right">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 font-sans">
+                          {eventRegistrations.length === 0 ? (
+                            <tr>
+                              <td colSpan="7" className="px-4 py-12 text-center text-white/30 italic">
+                                No hay pre-registros de asistencia cargados en el sistema.
+                              </td>
+                            </tr>
+                          ) : (
+                            eventRegistrations.map((reg) => {
+                              const regDate = reg.registeredAt ? new Date(reg.registeredAt.seconds * 1000).toLocaleString() : "";
+                              return (
+                                <tr key={reg.id} className="hover:bg-white/5 transition-colors">
+                                  <td className="px-4 py-3 whitespace-nowrap text-white/50">{regDate}</td>
+                                  <td className="px-4 py-3 font-semibold text-white">{reg.eventTitle}</td>
+                                  <td className="px-4 py-3 font-bold text-pizza-gold">{reg.name}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <a
+                                      href={`https://wa.me/${reg.phone.replace(/[^0-9]/g, "")}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-green-400 hover:underline flex items-center gap-1"
+                                    >
+                                      💬 {reg.phone}
+                                    </a>
+                                  </td>
+                                  <td className="px-4 py-3 text-white/70">{reg.email}</td>
+                                  <td className="px-4 py-3">
+                                    <span className="bg-pizza-gold/10 text-pizza-gold border border-pizza-gold/20 px-2 py-0.5 rounded font-mono font-bold text-[10px]">
+                                      {reg.couponCode || "NINGUNO"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <button
+                                      onClick={() => handleDeleteRegistration(reg.id, reg.name)}
+                                      className="text-pizza-red hover:text-red-400 font-bold hover:underline bg-transparent border-0 cursor-pointer"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -4748,6 +5545,201 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                 >
                   {isSavingExpense && <Loader2 size={12} className="animate-spin" />}
                   Registrar Egreso
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CRUD EVENTOS */}
+      {isEventModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#181818] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col text-left animate-in fade-in zoom-in-95 duration-250">
+            <div className="flex items-center justify-between p-5 border-b border-white/5">
+              <h3 className="font-pizza-title text-sm font-bold uppercase text-white/70 flex items-center gap-2">
+                <Calendar size={16} className="text-pizza-gold" />
+                {crudEvent ? `Editar Evento: ${crudEvent.title}` : "Crear Nuevo Evento"}
+              </h3>
+              <button
+                onClick={() => setIsEventModalOpen(false)}
+                className="p-1 rounded-full hover:bg-white/5 text-white/60 hover:text-white cursor-pointer transition-colors border-0 bg-transparent"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveEvent} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5 font-pizza-title">Título del Evento</label>
+                <input
+                  type="text"
+                  required
+                  value={eventForm.title}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Ej. Sábado de Pizza & Blues en Vivo"
+                  className="w-full bg-[#101010] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5 font-pizza-title">Descripción / Detalles</label>
+                <textarea
+                  required
+                  value={eventForm.description}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Describe de qué trata el evento, qué se ofrecerá de comida o bebida, shows, etc."
+                  rows="3"
+                  className="w-full bg-[#101010] border border-white/5 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5 font-pizza-title">Fecha del Evento</label>
+                  <input
+                    type="date"
+                    required
+                    value={eventForm.date}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full bg-[#101010] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5 font-pizza-title">Hora de Inicio</label>
+                  <input
+                    type="time"
+                    required
+                    value={eventForm.time}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, time: e.target.value }))}
+                    className="w-full bg-[#101010] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5 font-pizza-title">Código Cupón Promocional</label>
+                  <input
+                    type="text"
+                    value={eventForm.couponCode}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, couponCode: e.target.value }))}
+                    placeholder="Ej. BLUES15 (En mayúsculas)"
+                    className="w-full bg-[#101010] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white uppercase focus:outline-none focus:border-pizza-gold/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5 font-pizza-title">Descuento del Cupón (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={eventForm.discountPercent}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, discountPercent: e.target.value }))}
+                    placeholder="Ej. 15"
+                    className="w-full bg-[#101010] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 font-pizza-title">
+                  Imagen / Banner del Evento
+                </label>
+                <p className="text-[9px] text-white/30 leading-tight">
+                  Medidas sugeridas: <strong>1200 x 480 píxeles</strong> (proporción horizontal 2.5:1). Al subir, la imagen se comprimirá y optimizará automáticamente en la nube.
+                </p>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="flex flex-col items-center justify-center h-28 bg-[#101010] border border-dashed border-white/10 rounded-xl hover:border-pizza-gold/30 hover:bg-[#121212] transition-all cursor-pointer group text-center p-3 relative">
+                      {uploadingEventBanner ? (
+                        <div className="flex flex-col items-center gap-1.5 text-white/40">
+                          <Loader2 size={20} className="animate-spin text-pizza-gold" />
+                          <span className="text-[10px] font-bold font-pizza-title">Subiendo...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1 text-white/50 group-hover:text-white/80 transition-colors">
+                          <span className="text-xl">📷</span>
+                          <span className="text-[10px] font-bold">Seleccionar Imagen</span>
+                          <span className="text-[8px] text-white/30">WebP, JPG, PNG</span>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingEventBanner}
+                        onChange={handleEventBannerUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {uploadEventBannerError && (
+                      <p className="text-pizza-red text-[9px] font-semibold mt-1">{uploadEventBannerError}</p>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col justify-between gap-2">
+                    <div>
+                      <label className="block text-[9px] text-white/50 font-bold uppercase tracking-wider mb-1">O pegar URL directa:</label>
+                      <input
+                        type="text"
+                        value={eventForm.bannerUrl}
+                        onChange={(e) => setEventForm(prev => ({ ...prev, bannerUrl: e.target.value }))}
+                        placeholder="https://ejemplo.com/imagen.jpg"
+                        className="w-full bg-[#101010] border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-gold/50"
+                      />
+                    </div>
+                    {eventForm.bannerUrl && (
+                      <div className="relative h-12 rounded-lg overflow-hidden border border-white/10 bg-black/20 flex items-center justify-between px-3 py-1.5">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <img 
+                            src={eventForm.bannerUrl} 
+                            alt="Vista previa banner" 
+                            className="w-12 h-8 object-cover rounded border border-white/10 shrink-0" 
+                          />
+                          <span className="text-[9px] text-white/40 truncate font-mono">{eventForm.bannerUrl}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEventForm(prev => ({ ...prev, bannerUrl: "" }))}
+                          className="text-pizza-red hover:text-red-400 font-bold text-[9px] shrink-0 hover:underline border-0 bg-transparent cursor-pointer"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 text-left">
+                <input
+                  type="checkbox"
+                  id="event-active-check"
+                  checked={eventForm.active}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, active: e.target.checked }))}
+                  className="w-4 h-4 rounded border-white/10 bg-[#101010] text-pizza-red focus:ring-pizza-red/20 focus:ring-opacity-50"
+                />
+                <label htmlFor="event-active-check" className="text-xs text-white/80 font-bold select-none cursor-pointer">
+                  Publicar evento inmediatamente (Visible para clientes)
+                </label>
+              </div>
+
+              <div className="pt-4 border-t border-white/5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEventModalOpen(false)}
+                  className="bg-white/5 hover:bg-white/10 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors cursor-pointer border-0"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEvent}
+                  className="bg-pizza-gold text-pizza-dark hover:bg-pizza-gold/90 disabled:opacity-50 text-xs font-black px-5 py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-pizza-gold/10 flex items-center gap-1.5 border-0"
+                >
+                  {savingEvent && <Loader2 size={12} className="animate-spin" />}
+                  {crudEvent ? "Actualizar Evento" : "Crear Evento"}
                 </button>
               </div>
             </form>

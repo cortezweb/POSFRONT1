@@ -764,6 +764,14 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                     💳 Transf.
                   </button>
                 </div>
+                {paymentMethod === "yape" && businessConfig.yapeQrUrl && (
+                  <div className="mt-3 flex flex-col items-center justify-center p-3 bg-white/5 border border-white/5 rounded-xl gap-2 text-center">
+                    <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider">QR Yape / Plin</span>
+                    <div className="w-32 h-32 bg-white rounded-lg p-1.5 flex items-center justify-center shadow-md">
+                      <img src={businessConfig.yapeQrUrl} alt="QR Yape" className="w-full h-full object-contain" />
+                    </div>
+                  </div>
+                )}
               </div>
             </form>
           </div>
@@ -1142,6 +1150,14 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                           Transf. 💳
                         </button>
                       </div>
+                      {paymentMethod === "yape" && businessConfig.yapeQrUrl && (
+                        <div className="mt-3 flex flex-col items-center justify-center p-3 bg-white/5 border border-white/5 rounded-xl gap-2 text-center">
+                          <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider">QR Yape / Plin</span>
+                          <div className="w-32 h-32 bg-white rounded-lg p-1.5 flex items-center justify-center shadow-md">
+                            <img src={businessConfig.yapeQrUrl} alt="QR Yape" className="w-full h-full object-contain" />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

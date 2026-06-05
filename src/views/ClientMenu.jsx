@@ -7,7 +7,7 @@ import { MapboxSearch } from "../components/MapboxSearch";
 import { 
   ShoppingBag, Trash2, Plus, Minus, X, 
   Check, ChevronRight, MessageSquare, Tag, Loader2,
-  Home, QrCode, Crown, Percent, User, Info, Menu, Search
+  Home, Percent, User, Menu, Search, Calendar, Clock, BookOpen
 } from "lucide-react";
 
 export const ClientMenu = () => {
@@ -47,6 +47,13 @@ export const ClientMenu = () => {
   const [trackLoading, setTrackLoading] = useState(false);
   const [trackError, setTrackError] = useState("");
   const [trackResults, setTrackResults] = useState([]);
+
+  // Estados para Módulo de Eventos & Pre-registro
+  const [events, setEvents] = useState([]);
+  const [selectedEventForReg, setSelectedEventForReg] = useState(null);
+  const [regForm, setRegForm] = useState({ name: "", phone: "", email: "", optIn: true });
+  const [registeringEvent, setRegisteringEvent] = useState(false);
+  const [regSuccessCoupon, setRegSuccessCoupon] = useState("");
 
   const handleSearchOrder = async (e) => {
     e.preventDefault();
@@ -109,6 +116,73 @@ export const ClientMenu = () => {
       }
     } finally {
       setTrackLoading(false);
+    }
+  };
+
+  // Suscribirse a eventos activos de Firestore en tiempo real
+  useEffect(() => {
+    const q = query(collection(db, "events"), where("active", "==", true), orderBy("date", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const evs = [];
+      snapshot.forEach((doc) => {
+        evs.push({ id: doc.id, ...doc.data() });
+      });
+      setEvents(evs);
+    }, (error) => {
+      console.error("Error al cargar eventos en cliente:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sincronizar campos del formulario de pre-registro con checkout
+  useEffect(() => {
+    if (selectedEventForReg) {
+      setRegForm({
+        name: customerName || "",
+        phone: customerPhone || "",
+        email: "",
+        optIn: true
+      });
+      setRegSuccessCoupon("");
+    }
+  }, [selectedEventForReg, customerName, customerPhone]);
+
+  // Manejar el submit del pre-registro
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    if (!regForm.name.trim() || !regForm.phone.trim() || !regForm.email.trim()) {
+      alert("Todos los campos obligatorios deben ser completados.");
+      return;
+    }
+
+    setRegisteringEvent(true);
+    try {
+      await addDoc(collection(db, "event_registrations"), {
+        eventId: selectedEventForReg.id,
+        eventTitle: selectedEventForReg.title,
+        name: regForm.name.trim(),
+        phone: regForm.phone.trim(),
+        email: regForm.email.trim(),
+        couponCode: selectedEventForReg.couponCode || "",
+        registeredAt: serverTimestamp()
+      });
+
+      // Guardar nombre y tlf para autocompletar checkout
+      setCustomerName(regForm.name.trim());
+      setCustomerPhone(regForm.phone.trim());
+
+      // Auto-aplicar cupón si aplica
+      if (selectedEventForReg.couponCode) {
+        applyCoupon(selectedEventForReg.couponCode);
+        setRegSuccessCoupon(selectedEventForReg.couponCode);
+      } else {
+        setRegSuccessCoupon("SUCCESS_NO_COUPON");
+      }
+    } catch (err) {
+      console.error("Error al guardar asistencia:", err);
+      alert("Error al procesar el pre-registro. Inténtalo nuevamente.");
+    } finally {
+      setRegisteringEvent(false);
     }
   };
 
@@ -1081,48 +1155,75 @@ export const ClientMenu = () => {
             </div>
           )}
 
-          {activeMobileTab === "fidelizacion" && (
-            <div className="flex flex-col items-center justify-center space-y-6 py-4">
+          {activeMobileTab === "eventos" && (
+            <div className="space-y-6">
               <div className="text-center space-y-1">
                 <h3 className="font-pizza-title text-base font-bold text-white flex items-center justify-center gap-1.5">
-                  <Crown size={16} className="text-pizza-gold" />
-                  Pizza Club Fidelidad
+                  <Calendar size={16} className="text-pizza-gold" />
+                  Próximos Eventos & Promociones
                 </h3>
-                <p className="text-[11px] text-white/50">Acumula 10% de tus compras en puntos.</p>
+                <p className="text-[11px] text-white/50">Regístrate a nuestros eventos y obtén beneficios al instante.</p>
               </div>
 
-              {/* Tarjeta de fidelidad digital */}
-              <div className="w-full max-w-sm rounded-3xl p-5 border border-white/10 shadow-2xl relative overflow-hidden bg-gradient-to-br from-[#1c1c1c] via-[#2d2417] to-[#121212] text-left">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-pizza-gold/5 rounded-full blur-2xl pointer-events-none" />
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <span className="text-pizza-gold text-[9px] font-bold uppercase tracking-widest block">PIZZA CLUB MEMBER</span>
-                    <span className="text-xs font-bold text-white">Hamilton POS Club</span>
+              {/* Grid / Lista de Eventos */}
+              <div className="space-y-4 text-left">
+                {events.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center text-white/35 bg-[#181818]/40 border border-white/5 rounded-3xl p-6">
+                    <span className="text-3xl mb-2">🎉🍕</span>
+                    <h4 className="font-bold text-xs text-white">¡Próximamente más eventos!</h4>
+                    <p className="text-[10px] text-white/45 mt-1 max-w-[220px] leading-relaxed">
+                      Estamos preparando noches especiales con música en vivo, catas y descuentos increíbles. ¡Mantente al tanto!
+                    </p>
                   </div>
-                  <span className="text-xl">🍕</span>
-                </div>
+                ) : (
+                  events.map((event) => (
+                    <div
+                      key={event.id}
+                      className="relative rounded-3xl overflow-hidden border border-white/10 p-5 bg-gradient-to-br from-[#1b1b1b] to-[#111] flex flex-col justify-between min-h-[170px] shadow-lg"
+                    >
+                      {event.bannerUrl && (
+                        <div 
+                          className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none filter blur-xs" 
+                          style={{ backgroundImage: `url(${event.bannerUrl})` }} 
+                        />
+                      )}
 
-                <div className="mb-4">
-                  <span className="text-[9px] text-white/40 uppercase block">Saldo de Puntos</span>
-                  <span className="text-xl font-black text-pizza-gold">850 Puntos</span>
-                </div>
+                      <div className="relative space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[8px] bg-pizza-gold text-pizza-charcoal font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Evento Especial
+                          </span>
+                          <span className="text-[9px] text-[#ffd79b] font-bold flex items-center gap-1">
+                            <Calendar size={11} className="inline shrink-0" /> {event.date} | <Clock size={11} className="inline shrink-0" /> {event.time}
+                          </span>
+                        </div>
 
-                <div className="flex justify-between items-end">
-                  <span className="font-mono text-[10px] text-white/60 tracking-widest">ID: 9812-4029-1102</span>
-                  <span className="bg-pizza-gold/20 border border-pizza-gold/30 text-pizza-gold text-[9px] font-bold px-2 py-0.5 rounded-md uppercase">
-                    Socio Oro
-                  </span>
-                </div>
-              </div>
+                        <h4 className="font-pizza-title text-base font-black text-white leading-tight">
+                          {event.title}
+                        </h4>
+                        <p className="text-[11px] text-white/70 font-sans leading-relaxed">
+                          {event.description}
+                        </p>
 
-              {/* QR Code */}
-              <div className="bg-white p-4 rounded-2xl shadow-xl flex flex-col items-center gap-2">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin)}`} 
-                  alt="QR Club" 
-                  className="w-36 h-36"
-                />
-                <span className="text-[9px] text-black/60 font-mono tracking-widest uppercase mt-1">Hamilton vCard</span>
+                        {event.couponCode && (
+                          <div className="inline-flex items-center gap-1.5 bg-pizza-red/10 border border-pizza-red/20 rounded-xl px-3 py-1.5 text-[10px] text-pizza-red font-bold mt-1">
+                            🎁 Regístrate y recibe: {event.discountPercent}% OFF (Cupón: {event.couponCode})
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="relative mt-4 pt-3 border-t border-white/5 flex justify-between items-center shrink-0">
+                        <span className="text-[9px] text-white/40 font-semibold">Entrada libre con registro</span>
+                        <button
+                          onClick={() => setSelectedEventForReg(event)}
+                          className="bg-pizza-gold hover:bg-pizza-gold/90 text-pizza-charcoal text-[10px] font-black px-4 py-2 rounded-xl transition-all cursor-pointer shadow-md shadow-pizza-gold/10 border-0"
+                        >
+                          Pre-registrarse
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -1336,6 +1437,14 @@ export const ClientMenu = () => {
                             💳 Transf.
                           </button>
                         </div>
+                        {paymentMethod === "yape" && businessConfig.yapeQrUrl && (
+                          <div className="mt-4 flex flex-col items-center justify-center p-4 bg-white/5 border border-white/5 rounded-2xl gap-2 text-center">
+                            <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider">Escanea el QR para pagar con Yape o Plin</span>
+                            <div className="w-40 h-40 bg-white rounded-xl p-2 flex items-center justify-center shadow-lg">
+                              <img src={businessConfig.yapeQrUrl} alt="QR Yape" className="w-full h-full object-contain" />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1408,18 +1517,18 @@ export const ClientMenu = () => {
               activeMobileTab === "menu" ? "text-pizza-gold font-extrabold scale-105" : "text-white/40"
             }`}
           >
-            <span className="text-sm leading-none shrink-0 filter drop-shadow">🍕</span>
+            <BookOpen size={18} />
             <span>Carta</span>
           </button>
 
           <button
-            onClick={() => setActiveMobileTab("fidelizacion")}
+            onClick={() => setActiveMobileTab("eventos")}
             className={`flex flex-col items-center gap-1.5 flex-1 border-0 bg-transparent py-1 cursor-pointer ${
-              activeMobileTab === "fidelizacion" ? "text-pizza-gold font-extrabold scale-105" : "text-white/40"
+              activeMobileTab === "eventos" ? "text-pizza-gold font-extrabold scale-105" : "text-white/40"
             }`}
           >
-            <QrCode size={18} />
-            <span>Club QR</span>
+            <Calendar size={18} />
+            <span>Eventos</span>
           </button>
 
           <button
@@ -1976,6 +2085,14 @@ export const ClientMenu = () => {
                             💳 Transf.
                           </button>
                         </div>
+                        {paymentMethod === "yape" && businessConfig.yapeQrUrl && (
+                          <div className="mt-4 flex flex-col items-center justify-center p-4 bg-white/5 border border-white/5 rounded-2xl gap-2 text-center">
+                            <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider">Escanea el QR para pagar con Yape o Plin</span>
+                            <div className="w-40 h-40 bg-white rounded-xl p-2 flex items-center justify-center shadow-lg">
+                              <img src={businessConfig.yapeQrUrl} alt="QR Yape" className="w-full h-full object-contain" />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -2133,6 +2250,152 @@ export const ClientMenu = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE PRE-REGISTRO A EVENTOS */}
+      {selectedEventForReg && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#161616] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col text-left animate-in fade-in zoom-in-95 duration-250">
+            <div className="flex items-center justify-between p-5 border-b border-white/5">
+              <h3 className="font-pizza-title text-sm font-bold uppercase text-white/70 flex items-center gap-1.5">
+                <Calendar size={15} className="text-pizza-gold" />
+                Pre-registro
+              </h3>
+              {!registeringEvent && (
+                <button
+                  onClick={() => setSelectedEventForReg(null)}
+                  className="p-1 rounded-full hover:bg-white/5 text-white/60 hover:text-white cursor-pointer border-0 bg-transparent"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+
+            <div className="p-6">
+              {!regSuccessCoupon ? (
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  <div className="text-center pb-2">
+                    <span className="text-[10px] text-pizza-gold font-bold uppercase tracking-wider block">Registrándote para:</span>
+                    <h4 className="text-sm font-bold text-white leading-tight mt-0.5">{selectedEventForReg.title}</h4>
+                    <span className="text-[10px] text-white/40 block mt-1">📅 {selectedEventForReg.date} | ⏰ {selectedEventForReg.time}</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-white/40 mb-1 font-pizza-title">Tu Nombre Completo</label>
+                    <input
+                      type="text"
+                      required
+                      value={regForm.name}
+                      onChange={(e) => setRegForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Ej. Juan Pérez"
+                      className="w-full bg-pizza-dark/80 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-gold/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-white/40 mb-1 font-pizza-title">Teléfono / WhatsApp</label>
+                    <input
+                      type="tel"
+                      required
+                      value={regForm.phone}
+                      onChange={(e) => setRegForm(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="Ej. +51 987654321"
+                      className="w-full bg-pizza-dark/80 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-gold/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-white/40 mb-1 font-pizza-title">Correo Electrónico</label>
+                    <input
+                      type="email"
+                      required
+                      value={regForm.email}
+                      onChange={(e) => setRegForm(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="ejemplo@correo.com"
+                      className="w-full bg-pizza-dark/80 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-gold/50"
+                    />
+                  </div>
+
+                  <div className="flex items-start gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="optin-check"
+                      checked={regForm.optIn}
+                      onChange={(e) => setRegForm(prev => ({ ...prev, optIn: e.target.checked }))}
+                      className="w-4 h-4 mt-0.5 rounded border-white/10 bg-pizza-dark text-pizza-red focus:ring-pizza-red/20 focus:ring-opacity-50 cursor-pointer"
+                    />
+                    <label htmlFor="optin-check" className="text-[10px] text-white/60 leading-tight select-none cursor-pointer">
+                      Acepto recibir invitaciones a futuros eventos y promociones exclusivas vía WhatsApp o Email.
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={registeringEvent}
+                    className="w-full bg-pizza-gold hover:bg-pizza-gold/90 text-pizza-charcoal rounded-xl py-3 font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-pizza-gold/10 border-0 mt-2 disabled:opacity-50"
+                  >
+                    {registeringEvent ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        Confirmar Asistencia
+                        <ChevronRight size={14} />
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <div className="text-center space-y-4 py-2">
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 border border-green-500/25 flex items-center justify-center text-green-400 mx-auto text-xl animate-bounce">
+                    ✓
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-pizza-title text-base font-black text-white leading-tight">¡Pre-registro Exitoso!</h4>
+                    <p className="text-[11px] text-white/60 mt-1 font-sans leading-relaxed">
+                      Te hemos registrado para <strong>{selectedEventForReg.title}</strong>. ¡Te esperamos!
+                    </p>
+                  </div>
+
+                  {regSuccessCoupon !== "SUCCESS_NO_COUPON" ? (
+                    <div className="bg-pizza-gold/5 border border-pizza-gold/25 rounded-2xl p-4 space-y-2">
+                      <span className="text-[9px] uppercase font-bold text-pizza-gold tracking-widest block">TU CUPÓN DE DESCUENTO</span>
+                      <span className="font-mono text-lg font-black text-white bg-white/5 px-4 py-1.5 rounded-lg border border-white/10 inline-block tracking-widest">
+                        {regSuccessCoupon}
+                      </span>
+                      <p className="text-[10px] text-white/50 leading-tight">
+                        Se ha aplicado **automáticamente** un <strong>{selectedEventForReg.discountPercent}% de descuento</strong> a tu orden actual.
+                      </p>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(regSuccessCoupon);
+                          alert("Código de cupón copiado al portapapeles.");
+                        }}
+                        className="text-[9px] text-[#ffd79b] hover:underline font-bold bg-transparent border-0 cursor-pointer block mx-auto"
+                      >
+                        Copiar Código
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-white/40 bg-white/5 border border-white/5 rounded-xl p-3 leading-relaxed">
+                      Presenta tu nombre al ingresar. No es necesario presentar ticket digital.
+                    </p>
+                  )}
+
+                  <button
+                    onClick={() => setSelectedEventForReg(null)}
+                    className="w-full bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl py-2.5 font-bold text-xs transition-colors cursor-pointer border-0 mt-2"
+                  >
+                    Volver al Menú
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

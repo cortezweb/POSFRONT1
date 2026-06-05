@@ -26,6 +26,7 @@ export const CartProvider = ({ children }) => {
     currency: "USD",
     whatsappNumber: "+51999999999",
     vCardEnabled: true,
+    yapeQrUrl: "",
     maintenanceMessage: "El local se encuentra cerrado temporalmente.",
     tax: { taxEnabled: true, taxRate: 18, taxIncluded: false, taxName: "IGV" },
     discounts: {

@@ -1,15 +1,12 @@
 import { useState } from "react";
 import { loginUser } from "../firebase/auth";
-import { seedDatabase } from "../utils/dbSeeder";
-import { Lock, Mail, Server, RefreshCw, AlertCircle, ArrowRight } from "lucide-react";
+import { Lock, Mail, RefreshCw, AlertCircle, ArrowRight } from "lucide-react";
 
 export const Login = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [seeding, setSeeding] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [seedLogs, setSeedLogs] = useState([]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,30 +29,6 @@ export const Login = ({ onLoginSuccess }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSeed = async () => {
-    if (window.confirm("¿Deseas inicializar la base de datos con la configuración, productos y cuentas de prueba?")) {
-      setSeeding(true);
-      setSeedLogs(["Iniciando siembra..."]);
-      try {
-        const res = await seedDatabase();
-        if (res.success) {
-          setSeedLogs([...res.logs, "✅ Siembra finalizada con éxito."]);
-        } else {
-          setSeedLogs([...res.logs, `❌ Error: ${res.error}`]);
-        }
-      } catch (err) {
-        setSeedLogs((prev) => [...prev, `❌ Error crítico: ${err.message}`]);
-      } finally {
-        setSeeding(false);
-      }
-    }
-  };
-
-  const fillCredentials = (roleEmail, rolePass) => {
-    setEmail(roleEmail);
-    setPassword(rolePass);
   };
 
   return (
@@ -137,53 +110,6 @@ export const Login = ({ onLoginSuccess }) => {
             )}
           </button>
         </form>
-
-        {/* Cuentas de Acceso Rápido */}
-        <div className="mt-8 pt-6 border-t border-white/5">
-          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/40 text-center mb-3">
-            Accesos de Prueba Rápidos
-          </span>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => fillCredentials("admin@posvcard.com", "admin123")}
-              className="bg-white/5 hover:bg-white/10 text-xs py-2 px-1.5 rounded-lg text-white/80 transition-colors border border-white/5 cursor-pointer text-center font-medium"
-            >
-              Administrador
-            </button>
-            <button
-              onClick={() => fillCredentials("cajero@posvcard.com", "cajero123")}
-              className="bg-white/5 hover:bg-white/10 text-xs py-2 px-1.5 rounded-lg text-white/80 transition-colors border border-white/5 cursor-pointer text-center font-medium"
-            >
-              Cajero / POS
-            </button>
-            <button
-              onClick={() => fillCredentials("cocinero@posvcard.com", "cocinero123")}
-              className="bg-white/5 hover:bg-white/10 text-xs py-2 px-1.5 rounded-lg text-white/80 transition-colors border border-white/5 cursor-pointer text-center font-medium"
-            >
-              Cocinero
-            </button>
-          </div>
-        </div>
-
-        {/* Herramientas de Base de Datos */}
-        <div className="mt-6 pt-5 border-t border-white/5 text-center">
-          <button
-            onClick={handleSeed}
-            disabled={seeding}
-            className="inline-flex items-center gap-2 bg-[#ffd79b]/10 hover:bg-[#ffd79b]/15 text-[#ffd79b] text-xs font-semibold py-2 px-4 rounded-xl border border-[#ffd79b]/20 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <Server size={14} />
-            {seeding ? "Sembrando..." : "Inicializar Base de Datos de Prueba"}
-          </button>
-
-          {seedLogs.length > 0 && (
-            <div className="mt-4 text-left bg-black/40 border border-white/5 rounded-xl p-3 max-h-32 overflow-y-auto text-[10px] font-mono text-white/70 space-y-1">
-              {seedLogs.map((log, idx) => (
-                <div key={idx}>{log}</div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

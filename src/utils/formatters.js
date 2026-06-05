@@ -2,11 +2,21 @@
  * Formatea un monto numérico a formato de moneda local.
  */
 export const formatCurrency = (amount, currency = "USD") => {
-  return new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 2
-  }).format(amount);
+  try {
+    return new Intl.NumberFormat("es-PE", {
+      style: "currency",
+      currency: currency,
+      minimumFractionDigits: 2
+    }).format(amount);
+  } catch (e) {
+    // Fallback para símbolos o códigos de moneda no estándar (ej: "Bs", "S/.", "$")
+    const formatted = new Intl.NumberFormat("es-PE", {
+      style: "decimal",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+    return `${currency} ${formatted}`;
+  }
 };
 
 /**
