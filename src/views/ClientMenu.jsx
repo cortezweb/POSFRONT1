@@ -8,7 +8,7 @@ import {
   ShoppingBag, Trash2, Plus, Minus, X, 
   Check, ChevronRight, MessageSquare, Tag, Loader2,
   Home, Percent, User, Menu, Search, Calendar, Clock,
-  Utensils, TicketPercent, Truck
+  Utensils, Truck, ClipboardList
 } from "lucide-react";
 
 export const ClientMenu = () => {
@@ -802,45 +802,33 @@ export const ClientMenu = () => {
 
       {/* -------------------- INTERFAZ MÓVIL (Menor a MD) -------------------- */}
       <div className="md:hidden flex flex-col min-h-screen pb-16 text-pizza-dark">
-        {/* Cabecera Móvil Estilo Burger King */}
+        {/* Cabecera Móvil Estilo Stitch */}
         <header className="sticky top-0 z-40 bg-pizza-charcoal/90 backdrop-blur-xl border-b border-gray-200/50 px-4 py-3 flex items-center justify-between">
-          <button
-            onClick={() => setInfoDrawerOpen(true)}
-            className="p-2 hover:bg-gray-100 rounded-xl text-pizza-dark/75 hover:text-pizza-dark cursor-pointer border-0 bg-transparent"
-          >
-            <Menu size={20} />
-          </button>
-          
-          <div className="flex items-center gap-1.5 justify-center">
-            {businessConfig.logoUrl ? (
-              <img 
-                src={businessConfig.logoUrl} 
-                alt="Logo" 
-                className="w-6 h-6 rounded-full object-cover border border-gray-200" 
-                onError={(e) => { e.target.style.display = 'none'; }} 
-              />
-            ) : (
-              <span className="text-xl">🍕</span>
-            )}
-            <span className="font-pizza-title text-base font-black uppercase tracking-wider text-pizza-dark">
-              {businessConfig.name || "Pizza Hub"}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setInfoDrawerOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded-xl text-pizza-dark/75 hover:text-pizza-dark cursor-pointer border-0 bg-transparent"
+            >
+              <Menu size={20} />
+            </button>
+            <span className="font-pizza-title text-base font-black uppercase tracking-wider text-pizza-red">
+              {businessConfig.name || "Q'Pique"}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setIsTrackModalOpen(true)}
-              className="p-2 hover:bg-gray-100 rounded-xl text-pizza-red cursor-pointer border-0 bg-transparent"
-              title="Seguir mi pedido"
+              onClick={() => setActiveMobileTab("cart")}
+              className="relative p-2 hover:bg-gray-100 rounded-xl text-pizza-red cursor-pointer border-0 bg-transparent flex items-center justify-center"
+              title="Ver mi carrito"
             >
-              <Truck size={20} />
+              <ShoppingBag size={20} />
+              {cart.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-pizza-red text-white text-[8px] font-extrabold w-4.5 h-4.5 rounded-full flex items-center justify-center border border-white keep-white">
+                  {cart.reduce((acc, item) => acc + item.quantity, 0)}
+                </span>
+              )}
             </button>
-            <a
-              href="#/login"
-              className="p-2 hover:bg-gray-100 rounded-xl text-pizza-dark/75 hover:text-pizza-dark cursor-pointer"
-            >
-              <User size={20} />
-            </a>
           </div>
         </header>
 
@@ -901,6 +889,56 @@ export const ClientMenu = () => {
                   )}
                 </div>
               </div>
+
+              {/* Cupones Disponibles en mobile (Estilo horizontal del mockup) */}
+              {availableCoupons.length > 0 && (
+                <div className="space-y-3 text-left">
+                  <div className="flex justify-between items-center px-1">
+                    <h3 className="font-pizza-title text-sm font-bold text-pizza-dark">Cupones Disponibles</h3>
+                    <button 
+                      onClick={() => setActiveMobileTab("offers")}
+                      className="text-pizza-red text-xs font-bold border-0 bg-transparent cursor-pointer"
+                    >
+                      Ver todos
+                    </button>
+                  </div>
+                  
+                  <div className="flex gap-4 overflow-x-auto pb-2 shrink-0 scrollbar-none">
+                    {availableCoupons.map(([code, discount]) => {
+                      const isApplied = couponCode === code;
+                      return (
+                        <div 
+                          key={code}
+                          className="min-w-[240px] max-w-[260px] bg-white border border-dashed border-pizza-red/30 rounded-2xl p-4.5 flex items-center justify-between shadow-sm shrink-0 active:scale-[0.98] transition-transform"
+                        >
+                          <div className="flex flex-col text-left">
+                            <span className="text-pizza-red font-black text-lg tracking-tighter">{code}</span>
+                            <span className="text-gray-500 text-[10px] font-medium truncate max-w-[120px]">
+                              {discount}% OFF en tu total
+                            </span>
+                          </div>
+                          
+                          {isApplied ? (
+                            <span className="text-[9px] bg-green-500/10 border border-green-500/35 text-green-600 font-bold px-2.5 py-1.5 rounded-full flex items-center gap-0.5 select-none">
+                              <Check size={8} />
+                              Listo
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                applyCoupon(code);
+                              }}
+                              className="bg-pizza-red hover:bg-pizza-red/90 text-white px-4 py-1.5 rounded-full text-[10px] font-bold shadow-md cursor-pointer border-0 keep-white"
+                            >
+                              Copiar
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Botones Gigantes de Pedido (Estilo Burger King) */}
               <div className="grid grid-cols-2 gap-3.5 text-pizza-dark">
@@ -1590,9 +1628,149 @@ export const ClientMenu = () => {
               )}
             </div>
           )}
+
+          {activeMobileTab === "pedidos" && (
+            <div className="space-y-6 text-left">
+              <div className="space-y-1">
+                <h3 className="font-pizza-title text-base font-bold text-pizza-dark flex items-center gap-1.5">
+                  <ClipboardList size={18} className="text-pizza-red" />
+                  Seguimiento de Pedidos
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  Ingresa el número de teléfono con el que realizaste tu pedido o el número de ticket (ej: 4912) para seguir su estado en tiempo real.
+                </p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm space-y-4">
+                <form onSubmit={handleSearchOrder} className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Teléfono o # de Orden"
+                    value={trackPhoneInput}
+                    onChange={(e) => setTrackPhoneInput(e.target.value)}
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-pizza-dark placeholder-gray-400 focus:outline-none focus:border-pizza-red focus:ring-1 focus:ring-pizza-red"
+                  />
+                  <button
+                    type="submit"
+                    disabled={trackLoading}
+                    className="bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl px-4 py-2.5 text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer border-0 keep-white shadow-md shadow-pizza-red/15"
+                  >
+                    {trackLoading ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+                    Buscar
+                  </button>
+                </form>
+
+                {trackError && (
+                  <div className="p-3 bg-pizza-red/10 border border-pizza-red/20 rounded-xl text-[11px] text-pizza-red text-center">
+                    {trackError}
+                  </div>
+                )}
+              </div>
+
+              {trackResults.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Pedidos Encontrados:</h4>
+                  <div className="space-y-3">
+                    {trackResults.map((res) => (
+                      <div
+                        key={res.id}
+                        onClick={() => {
+                          window.location.hash = `#/track/${res.id}`;
+                        }}
+                        className="bg-white border border-gray-150 rounded-2xl p-4 flex justify-between items-center cursor-pointer hover:border-pizza-red/30 transition-all shadow-sm active:scale-[0.98]"
+                      >
+                        <div>
+                          <span className="text-xs font-bold text-pizza-dark block">
+                            Orden #{res.orderNumber}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {res.createdAt ? new Date(res.createdAt.seconds * 1000).toLocaleString() : "Reciente"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${
+                            res.status === "pending_approval" ? "bg-pizza-gold/10 border-pizza-gold/20 text-pizza-gold" :
+                            res.status === "preparing" ? "bg-pizza-red/10 border-pizza-red/20 text-pizza-red" :
+                            res.status === "ready" ? "bg-emerald-50 border-emerald-200 text-emerald-600 font-bold" :
+                            res.status === "completed" ? "bg-gray-150 border-gray-250 text-gray-600" :
+                            "bg-red-50 border-red-200 text-red-600"
+                          }`}>
+                            {res.status === "pending_approval" ? "Por Aprobar" :
+                             res.status === "preparing" ? "Cocina" :
+                             res.status === "ready" ? "Listo" :
+                             res.status === "completed" ? "Entregado" :
+                             "Cancelado"}
+                          </span>
+                          <span className="text-[10px] font-bold text-pizza-dark">
+                            {formatCurrency(res.total, businessConfig.currency)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeMobileTab === "perfil" && (
+            <div className="space-y-6 text-left">
+              <div className="space-y-1">
+                <h3 className="font-pizza-title text-base font-bold text-pizza-dark flex items-center gap-1.5">
+                  <User size={18} className="text-pizza-red" />
+                  Mi Perfil de Cliente
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  Configura tus datos para que tus próximos pedidos se procesen más rápido.
+                </p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm space-y-4">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">Nombre Completo</label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Ingresa tu nombre"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4.5 py-2.5 text-xs text-pizza-dark placeholder-gray-400 focus:outline-none focus:border-pizza-red focus:ring-1 focus:ring-pizza-red"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">Teléfono (WhatsApp)</label>
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Ingresa tu teléfono"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4.5 py-2.5 text-xs text-pizza-dark placeholder-gray-400 focus:outline-none focus:border-pizza-red focus:ring-1 focus:ring-pizza-red"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">Dirección de Entrega</label>
+                    <MapboxSearch />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <a
+                  href="#/login"
+                  className="flex items-center justify-center gap-2 w-full bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-2xl py-3.5 text-xs font-bold text-gray-800 transition-colors shadow-sm"
+                >
+                  <User size={14} />
+                  Acceso Personal (POS / KDS / Admin)
+                </a>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Barra de Navegación Inferior Estilo Burger King */}
+        {/* Barra de Navegación Inferior Estilo Stitch (Inicio, Menú, Eventos, Pedidos, Perfil) */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-gray-200/80 pb-safe pt-2 px-3 flex justify-between items-center text-[10px]">
           <button
             onClick={() => setActiveMobileTab("home")}
@@ -1611,7 +1789,7 @@ export const ClientMenu = () => {
             }`}
           >
             <Utensils size={18} />
-            <span>Carta</span>
+            <span>Menú</span>
           </button>
 
           <button
@@ -1625,30 +1803,23 @@ export const ClientMenu = () => {
           </button>
 
           <button
-            onClick={() => setActiveMobileTab("offers")}
+            onClick={() => setActiveMobileTab("pedidos")}
             className={`flex flex-col items-center gap-1.5 flex-1 border-0 bg-transparent py-1 cursor-pointer ${
-              activeMobileTab === "offers" ? "text-pizza-red font-extrabold scale-105" : "text-pizza-dark/40"
+              activeMobileTab === "pedidos" ? "text-pizza-red font-extrabold scale-105" : "text-pizza-dark/40"
             }`}
           >
-            <TicketPercent size={18} />
-            <span>Promos</span>
+            <ClipboardList size={18} />
+            <span>Pedidos</span>
           </button>
 
           <button
-            onClick={() => setActiveMobileTab("cart")}
-            className={`flex flex-col items-center gap-1.5 flex-1 border-0 bg-transparent py-1 relative cursor-pointer ${
-              activeMobileTab === "cart" ? "text-pizza-red font-extrabold scale-105" : "text-pizza-dark/40"
+            onClick={() => setActiveMobileTab("perfil")}
+            className={`flex flex-col items-center gap-1.5 flex-1 border-0 bg-transparent py-1 cursor-pointer ${
+              activeMobileTab === "perfil" ? "text-pizza-red font-extrabold scale-105" : "text-pizza-dark/40"
             }`}
           >
-            <div className="relative">
-              <ShoppingBag size={18} />
-              {cart.length > 0 && (
-                <span className="absolute -top-1.5 -right-2 bg-pizza-red text-white text-[8px] font-extrabold w-4.5 h-4.5 rounded-full flex items-center justify-center border border-gray-200">
-                  {cart.reduce((acc, item) => acc + item.quantity, 0)}
-                </span>
-              )}
-            </div>
-            <span>Pedido</span>
+            <User size={18} />
+            <span>Perfil</span>
           </button>
         </nav>
       </div>
