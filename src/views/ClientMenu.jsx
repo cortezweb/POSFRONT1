@@ -279,6 +279,14 @@ export const ClientMenu = () => {
     }
   };
 
+  const handleBannerClick = () => {
+    if (!businessConfig.homeBannerProductId) return;
+    const linkedProduct = products.find(p => p.id === businessConfig.homeBannerProductId);
+    if (linkedProduct) {
+      handleOpenCustomize(linkedProduct);
+    }
+  };
+
   const handleOptionChange = (groupName, value) => {
     setOptionsSelected((prev) => ({ ...prev, [groupName]: value }));
   };
@@ -527,7 +535,10 @@ export const ClientMenu = () => {
 
         {/* Hero Banner */}
         <section className="px-6 pt-8 pb-4">
-          <div className="relative rounded-[32px] overflow-hidden border border-pizza-red/10 p-8 md:p-12 bg-gradient-to-br from-[#FFF5F1] to-white shadow-sm flex flex-col justify-between">
+          <div 
+            onClick={handleBannerClick}
+            className={`relative rounded-[32px] overflow-hidden border border-pizza-red/10 p-8 md:p-12 bg-gradient-to-br from-[#FFF5F1] to-white shadow-sm flex flex-col justify-between ${businessConfig.homeBannerProductId ? "cursor-pointer hover:shadow-md transition-all duration-300" : ""}`}
+          >
             <div className="max-w-2xl relative z-10 text-left">
               <span className="bg-pizza-red/10 border border-pizza-red/20 text-pizza-red text-[10px] font-bold px-4 py-1.5 rounded-full uppercase tracking-wider mb-6 inline-block">
                 Promociones Activas
@@ -591,9 +602,9 @@ export const ClientMenu = () => {
             {/* Abstract background shape */}
             <div className="absolute top-0 right-0 w-1/2 h-full hidden lg:block pointer-events-none select-none">
               <img 
-                className="w-full h-full object-cover opacity-12 mix-blend-multiply" 
+                className={`w-full h-full object-cover ${businessConfig.homeBannerUrl ? "opacity-95 rounded-r-[32px] [mask-image:linear-gradient(to_right,transparent,black_15%)]" : "opacity-12 mix-blend-multiply"}`} 
                 alt="Pizza Gourmet"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYoGneI4pI-8Eb4DtGVQMxjlTNo52gDYIAxGrJNq7ksf6zNzl2jp2VhKCHFbDiYJHr1briONU3QRmwFZKtD4h27ye2k5Hc01jJ97ROubdyCKfeWPKE3rxXkuJO7G3uY3BE1vqJYN9CwKG20LfLvW0cDU5Umkv9PBK7tUGOyf6he8x7nDXZyuy726F5d90MYjywFlC-8ct19Tu8UIWdoTyv_53NgrsKstqNUc0gDUmMYV76Mhr0_vWv4XzjASfA5GfKvqyxNifhWWQ"
+                src={businessConfig.homeBannerUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuAYoGneI4pI-8Eb4DtGVQMxjlTNo52gDYIAxGrJNq7ksf6zNzl2jp2VhKCHFbDiYJHr1briONU3QRmwFZKtD4h27ye2k5Hc01jJ97ROubdyCKfeWPKE3rxXkuJO7G3uY3BE1vqJYN9CwKG20LfLvW0cDU5Umkv9PBK7tUGOyf6he8x7nDXZyuy726F5d90MYjywFlC-8ct19Tu8UIWdoTyv_53NgrsKstqNUc0gDUmMYV76Mhr0_vWv4XzjASfA5GfKvqyxNifhWWQ"}
               />
             </div>
           </div>
@@ -837,11 +848,14 @@ export const ClientMenu = () => {
           {activeMobileTab === "home" && (
             <div className="space-y-6">
               {/* Gran Banner de bienvenida con Descuentos Progresivos de Stitch */}
-              <div className="relative w-full min-h-[220px] rounded-3xl overflow-hidden shadow-lg group">
+              <div 
+                onClick={handleBannerClick}
+                className={`relative w-full min-h-[220px] rounded-3xl overflow-hidden shadow-lg group ${businessConfig.homeBannerProductId ? "cursor-pointer" : ""}`}
+              >
                 <img 
                   alt="Deliciosa pizza artesanal" 
                   className="absolute inset-0 w-full h-full object-cover" 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBs46Wx6T7dbCuHdmrk990u3VpzK3Z0k1Lw1eeWIJRVqQfvpORp7_sb3Ut0mt5m54LhcJCgiCiz4PHRQyYW73mtR_CdPMMJnqpuGuECnK_puKRdBWgg56GFptmJF4PQ3hnbpCwYAHG9kaE60zvYdaMOwkelkCm7VBoL_ZckV92asnakI2pfAgx01t8hf0zrcs7_12Rp8KroE1WgnJn9i9T985WOgGXgEsHKnV7hKcyKz-90Ok5N91UaXfBP581_k9tTmTUOBeuiU6s"
+                  src={businessConfig.homeBannerUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuBs46Wx6T7dbCuHdmrk990u3VpzK3Z0k1Lw1eeWIJRVqQfvpORp7_sb3Ut0mt5m54LhcJCgiCiz4PHRQyYW73mtR_CdPMMJnqpuGuECnK_puKRdBWgg56GFptmJF4PQ3hnbpCwYAHG9kaE60zvYdaMOwkelkCm7VBoL_ZckV92asnakI2pfAgx01t8hf0zrcs7_12Rp8KroE1WgnJn9i9T985WOgGXgEsHKnV7hKcyKz-90Ok5N91UaXfBP581_k9tTmTUOBeuiU6s"}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent flex flex-col justify-end p-5 text-left">
                   <span className="text-white/80 font-bold text-[9px] uppercase tracking-widest mb-1 keep-white">

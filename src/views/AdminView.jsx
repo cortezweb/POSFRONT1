@@ -24,7 +24,7 @@ import {
   Check, X, Printer, Settings, LogOut, Loader2, ClipboardList, MessageSquare, 
   MapPin, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, 
   Download, Plus, Trash2, Edit2, Menu, Lock, FileText, Search, Store,
-  TrendingUp, Tag, Table, ChefHat, Info, Calendar
+  TrendingUp, Tag, Table, ChefHat, Info, Calendar, Image
 } from "lucide-react";
 
 import { usePermissions } from "../hooks/usePermissions";
@@ -52,6 +52,8 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const [uploadLogoError, setUploadLogoError] = useState("");
   const [uploadingQr, setUploadingQr] = useState(false);
   const [uploadQrError, setUploadQrError] = useState("");
+  const [uploadingHomeBanner, setUploadingHomeBanner] = useState(false);
+  const [uploadHomeBannerError, setUploadHomeBannerError] = useState("");
 
   // Estados y Refs para Mapa del Local
   const [adminMapSearch, setAdminMapSearch] = useState("");
@@ -1423,6 +1425,80 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       console.error("Error al procesar subida de QR:", err);
       setUploadQrError(err.message || "Error al procesar el archivo del QR.");
       setUploadingQr(false);
+    }
+  };
+
+  // Manejar subida de Banner de Inicio (Cloudinary -> Storage -> Base64)
+  const handleBannerUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingHomeBanner(true);
+    setUploadHomeBannerError("");
+
+    try {
+      // 1. Comprimir imagen localmente (WebP) a tamaño adecuado para Banner (1200px)
+      const compressedBlob = await compressImage(file, 1200, 0.85);
+      const compressedFile = new File([compressedBlob], `home_banner_${Date.now()}.webp`, { type: "image/webp" });
+
+      // A. Intentar con Cloudinary primero
+      if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET) {
+        try {
+          const formData = new FormData();
+          formData.append("file", compressedFile);
+          formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+          const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: "POST",
+            body: formData
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            let secureUrl = data.secure_url;
+            if (secureUrl.includes("/upload/")) {
+              secureUrl = secureUrl.replace("/upload/", "/upload/f_auto,q_auto/");
+            }
+            setSettingsForm((prev) => ({ ...prev, homeBannerUrl: secureUrl }));
+            setUploadingHomeBanner(false);
+            return;
+          }
+        } catch (cloudinaryErr) {
+          console.warn("Fallo subida de Banner a Cloudinary, intentando Firebase Storage...", cloudinaryErr);
+        }
+      }
+
+      // B. Intentar con Firebase Storage
+      if (storage) {
+        try {
+          const { ref: fRef, uploadBytes: fUploadBytes } = await import("firebase/storage");
+          const bannerRef = fRef(storage, `banners/home_banner_${Date.now()}.webp`);
+          await fUploadBytes(bannerRef, compressedFile);
+          const downloadURL = await getDownloadURL(bannerRef);
+          setSettingsForm((prev) => ({ ...prev, homeBannerUrl: downloadURL }));
+          setUploadingHomeBanner(false);
+          return;
+        } catch (firebaseStorageErr) {
+          console.warn("Fallo subida de Banner a Firebase Storage, recurriendo a Base64...", firebaseStorageErr);
+        }
+      }
+
+      // C. Fallback: Guardar como Base64 en Firestore
+      const reader = new FileReader();
+      reader.readAsDataURL(compressedBlob);
+      reader.onloadend = () => {
+        const base64data = reader.result;
+        setSettingsForm((prev) => ({ ...prev, homeBannerUrl: base64data }));
+        setUploadingHomeBanner(false);
+      };
+      reader.onerror = (readErr) => {
+        throw readErr;
+      };
+
+    } catch (err) {
+      console.error("Error al procesar subida de banner:", err);
+      setUploadHomeBannerError(err.message || "Error al procesar el archivo del banner.");
+      setUploadingHomeBanner(false);
     }
   };
 
@@ -4722,6 +4798,85 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                         <option value="false">No (Adicionado)</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Banner de Inicio */}
+                  <div className="border-t border-white/5 pt-4 space-y-4">
+                    <div className="flex items-center gap-2 text-pizza-gold">
+                      <Image size={18} />
+                      <h4 className="font-pizza-title font-bold text-xs uppercase">Banner de la Página de Inicio</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Imagen del Banner</label>
+                        <div className="flex gap-3 items-center">
+                          <input
+                            type="text"
+                            placeholder="URL del banner o sube una imagen..."
+                            value={settingsForm.homeBannerUrl || ""}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, homeBannerUrl: e.target.value }))}
+                            className="flex-1 bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                          />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleBannerUpload}
+                            className="hidden"
+                            id="home-banner-file-input"
+                            disabled={uploadingHomeBanner}
+                          />
+                          <label
+                            htmlFor="home-banner-file-input"
+                            className="bg-[#181818] border border-white/10 hover:bg-white/5 text-xs px-4 py-2.5 rounded-xl cursor-pointer transition-colors whitespace-nowrap flex items-center gap-1.5"
+                          >
+                            {uploadingHomeBanner ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin text-pizza-red" />
+                                Subiendo...
+                              </>
+                            ) : (
+                              <>
+                                <Download size={14} className="text-[#ffd79b] rotate-180" />
+                                Subir
+                              </>
+                            )}
+                          </label>
+                        </div>
+                        {uploadHomeBannerError && (
+                          <p className="text-[10px] text-red-500 font-medium mt-1">{uploadHomeBannerError}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Vincular a un Producto (Opcional)</label>
+                        <select
+                          value={settingsForm.homeBannerProductId || ""}
+                          onChange={(e) => setSettingsForm(prev => ({ ...prev, homeBannerProductId: e.target.value }))}
+                          className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                        >
+                          <option value="">-- No vincular a ningún producto --</option>
+                          {productsList.map((prod) => (
+                            <option key={prod.id} value={prod.id}>
+                              {prod.name} ({prod.category})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {settingsForm.homeBannerUrl && (
+                      <div className="relative rounded-2xl overflow-hidden border border-white/10 w-full h-32 bg-black/40">
+                        <img 
+                          src={settingsForm.homeBannerUrl} 
+                          alt="Banner preview" 
+                          className="w-full h-full object-cover" 
+                        />
+                        <div className="absolute top-2 right-2 bg-pizza-dark px-2 py-0.5 rounded text-[8px] text-white/80">
+                          Vista Previa del Banner
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <button
