@@ -54,6 +54,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const [uploadQrError, setUploadQrError] = useState("");
   const [uploadingHomeBanner, setUploadingHomeBanner] = useState(false);
   const [uploadHomeBannerError, setUploadHomeBannerError] = useState("");
+  const [bannerProductSearch, setBannerProductSearch] = useState("");
 
   // Estados y Refs para Mapa del Local
   const [adminMapSearch, setAdminMapSearch] = useState("");
@@ -173,39 +174,37 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     comboItemsText: "" // line separated
   });
 
-  useEffect(() => {
-    if (isCrudModalOpen) {
-      // Inicializar constructor visual desde los strings de crudForm
-      const parsedOpts = [];
-      if (crudForm.optionsText?.trim()) {
-        crudForm.optionsText.split("\n").forEach((line, idx) => {
-          const parts = line.split(":");
-          if (parts.length === 2) {
-            parsedOpts.push({
-              id: Date.now() + idx,
-              name: parts[0].trim(),
-              values: parts[1].split(",").map(v => v.trim()).filter(Boolean)
-            });
-          }
-        });
-      }
-      setVisualOptions(parsedOpts);
-
-      const parsedCombos = [];
-      if (crudForm.comboItemsText?.trim()) {
-        crudForm.comboItemsText.split("\n").forEach((item, idx) => {
-          if (item.trim()) {
-            parsedCombos.push({
-              id: Date.now() + idx,
-              value: item.trim()
-            });
-          }
-        });
-      }
-      setVisualCombos(parsedCombos);
-      setEditorMode("visual"); // Resetear a visual por defecto al abrir
+  // Inicializar constructor visual desde los strings de crudForm
+  const initializeVisualEditor = (optsText, combosText) => {
+    const parsedOpts = [];
+    if (optsText?.trim()) {
+      optsText.split("\n").forEach((line, idx) => {
+        const parts = line.split(":");
+        if (parts.length === 2) {
+          parsedOpts.push({
+            id: Date.now() + idx,
+            name: parts[0].trim(),
+            values: parts[1].split(",").map(v => v.trim()).filter(Boolean)
+          });
+        }
+      });
     }
-  }, [isCrudModalOpen]);
+    setVisualOptions(parsedOpts);
+
+    const parsedCombos = [];
+    if (combosText?.trim()) {
+      combosText.split("\n").forEach((item, idx) => {
+        if (item.trim()) {
+          parsedCombos.push({
+            id: Date.now() + idx,
+            value: item.trim()
+          });
+        }
+      });
+    }
+    setVisualCombos(parsedCombos);
+    setEditorMode("visual"); // Resetear a visual por defecto al abrir
+  };
 
   // Sincronizar estados visuales con los campos de texto correspondientes
   const syncOptionsToText = (newGroups) => {
@@ -565,10 +564,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     return () => unsubscribe();
   }, []);
 
-  // Sincronizar permisos por defecto cuando cambia el rol a registrar
-  useEffect(() => {
-    setStaffPermissions(ROLES_PERMISSIONS[staffRole] || []);
-  }, [staffRole]);
+  // Permisos por defecto se sincronizan directamente en el onChange del select
 
   // Suscribirse a turnos de caja
   useEffect(() => {
@@ -657,7 +653,6 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     return matchesSearch && matchesService;
   });
 
-  const inventoryCategories = ["all", ...categoriesListToUse.map((c) => c.id)];
   const filteredInventory = productsList.filter((prod) => {
     const searchLower = inventorySearch.toLowerCase();
     const matchesSearch = 
@@ -973,6 +968,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       optionsText: "",
       comboItemsText: ""
     });
+    initializeVisualEditor("", "");
     setIsCrudModalOpen(true);
   };
 
@@ -1006,6 +1002,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       optionsText: optsText,
       comboItemsText: combosText
     });
+    initializeVisualEditor(optsText, combosText);
     setIsCrudModalOpen(true);
   };
 
@@ -1709,7 +1706,6 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     const rows = shifts.map(s => {
       const openDate = s.openTime ? new Date(s.openTime.seconds * 1000).toLocaleString() : "";
       const closeDate = s.closeTime ? new Date(s.closeTime.seconds * 1000).toLocaleString() : "Turno Activo";
-      const totalExpectedCash = s.cashBase + (s.expectedCash || 0);
       return [
         openDate,
         closeDate,
@@ -2012,7 +2008,11 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   // Redirigir a la primera pestaña permitida si la seleccionada actualmente no está autorizada
   useEffect(() => {
     if (tabsList.length > 0 && !tabsList.find(t => t.id === activeTab)) {
-      setActiveTab(tabsList[0].id);
+      const firstId = tabsList[0].id;
+      const t = setTimeout(() => {
+        setActiveTab(firstId);
+      }, 0);
+      return () => clearTimeout(t);
     }
   }, [tabsList, activeTab]);
 
@@ -3974,7 +3974,11 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Rol en Pizzería</label>
                       <select
                         value={staffRole}
-                        onChange={(e) => setStaffRole(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setStaffRole(val);
+                          setStaffPermissions(ROLES_PERMISSIONS[val] || []);
+                        }}
                         className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white"
                       >
                         <option value="cashier">Cajero / POS</option>
@@ -4808,15 +4812,40 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Imagen del Banner</label>
+                      {/* Título y Subtítulo del Banner */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Título del Banner (Opcional)</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. ¡2x1 en Pizzas Especiales! (Dejar vacío para el nombre del producto)"
+                            value={settingsForm.homeBannerTitle || ""}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, homeBannerTitle: e.target.value }))}
+                            className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Subtítulo del Banner (Opcional)</label>
+                          <textarea
+                            placeholder="Ej. Pide cualquier pizza familiar y la segunda es gratis. (Dejar vacío para descripción de producto)"
+                            value={settingsForm.homeBannerSubtitle || ""}
+                            onChange={(e) => setSettingsForm(prev => ({ ...prev, homeBannerSubtitle: e.target.value }))}
+                            rows="2"
+                            className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50 resize-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Imagen del Banner */}
+                      <div className="space-y-3">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40">Imagen del Banner</label>
                         <div className="flex gap-3 items-center">
                           <input
                             type="text"
-                            placeholder="URL del banner o sube una imagen..."
+                            placeholder="URL de la imagen o sube un archivo..."
                             value={settingsForm.homeBannerUrl || ""}
                             onChange={(e) => setSettingsForm(prev => ({ ...prev, homeBannerUrl: e.target.value }))}
-                            className="flex-1 bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                            className="flex-1 bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-pizza-gold/50"
                           />
                           <input
                             type="file"
@@ -4828,7 +4857,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                           />
                           <label
                             htmlFor="home-banner-file-input"
-                            className="bg-[#181818] border border-white/10 hover:bg-white/5 text-xs px-4 py-2.5 rounded-xl cursor-pointer transition-colors whitespace-nowrap flex items-center gap-1.5"
+                            className="bg-[#181818] border border-white/10 hover:bg-white/5 text-xs px-4 py-2.5 rounded-xl cursor-pointer transition-colors whitespace-nowrap flex items-center gap-1.5 shrink-0"
                           >
                             {uploadingHomeBanner ? (
                               <>
@@ -4847,36 +4876,121 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                           <p className="text-[10px] text-red-500 font-medium mt-1">{uploadHomeBannerError}</p>
                         )}
                       </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Vincular a un Producto (Opcional)</label>
-                        <select
-                          value={settingsForm.homeBannerProductId || ""}
-                          onChange={(e) => setSettingsForm(prev => ({ ...prev, homeBannerProductId: e.target.value }))}
-                          className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white"
-                        >
-                          <option value="">-- No vincular a ningún producto --</option>
-                          {productsList.map((prod) => (
-                            <option key={prod.id} value={prod.id}>
-                              {prod.name} ({prod.category})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
                     </div>
 
-                    {settingsForm.homeBannerUrl && (
-                      <div className="relative rounded-2xl overflow-hidden border border-white/10 w-full h-32 bg-black/40">
-                        <img 
-                          src={settingsForm.homeBannerUrl} 
-                          alt="Banner preview" 
-                          className="w-full h-full object-cover" 
-                        />
-                        <div className="absolute top-2 right-2 bg-pizza-dark px-2 py-0.5 rounded text-[8px] text-white/80">
-                          Vista Previa del Banner
+                    {/* Selector Visual de Producto Vinculado */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/5 pt-4">
+                      <div className="space-y-2.5">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40">Vincular a un Producto (Opcional)</label>
+                        
+                        {/* Buscador interno */}
+                        <div className="relative">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" size={13} />
+                          <input
+                            type="text"
+                            placeholder="Filtrar productos..."
+                            value={bannerProductSearch}
+                            onChange={(e) => setBannerProductSearch(e.target.value)}
+                            className="w-full bg-[#181818] border border-white/5 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-gold/50"
+                          />
+                        </div>
+
+                        {/* Listado Visual */}
+                        <div className="bg-[#101010] border border-white/5 rounded-xl max-h-40 overflow-y-auto p-1.5 space-y-1 scrollbar-thin">
+                          <button
+                            type="button"
+                            onClick={() => setSettingsForm(prev => ({ ...prev, homeBannerProductId: "" }))}
+                            className={`w-full flex items-center justify-between text-left px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer border ${
+                              !settingsForm.homeBannerProductId 
+                                ? "bg-pizza-gold/10 text-pizza-gold font-bold border-pizza-gold/30" 
+                                : "hover:bg-white/5 text-white/60 border-transparent"
+                            }`}
+                          >
+                            <span>-- No vincular a ningún producto --</span>
+                            {!settingsForm.homeBannerProductId && <Check size={12} />}
+                          </button>
+
+                          {productsList
+                            .filter(prod => 
+                              prod.name?.toLowerCase().includes(bannerProductSearch.toLowerCase()) ||
+                              prod.category?.toLowerCase().includes(bannerProductSearch.toLowerCase())
+                            )
+                            .map((prod) => {
+                              const isSelected = settingsForm.homeBannerProductId === prod.id;
+                              return (
+                                <button
+                                  key={prod.id}
+                                  type="button"
+                                  onClick={() => setSettingsForm(prev => ({ ...prev, homeBannerProductId: prod.id }))}
+                                  className={`w-full flex items-center gap-2.5 text-left p-1.5 rounded-lg text-xs transition-colors cursor-pointer border ${
+                                    isSelected 
+                                      ? "bg-pizza-gold/10 text-pizza-gold font-bold border-pizza-gold/30" 
+                                      : "hover:bg-white/5 text-white/70 border-transparent"
+                                  }`}
+                                >
+                                  <img
+                                    src={prod.imageUrl}
+                                    alt={prod.name}
+                                    className="w-8 h-8 rounded-lg object-cover bg-black/25 shrink-0 border border-white/5"
+                                    onError={(e) => { e.target.src = '/pwa-192x192.png'; }}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="truncate font-semibold">{prod.name}</p>
+                                    <p className="text-[9px] text-white/40 truncate uppercase">{prod.category} • {formatCurrency(prod.price, settingsForm.currency)}</p>
+                                  </div>
+                                  {isSelected && <Check size={12} className="shrink-0 mr-1" />}
+                                </button>
+                              );
+                            })}
+                        </div>
+
+                        {/* Acciones del Producto Vinculado */}
+                        {settingsForm.homeBannerProductId && (
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const selectedProd = productsList.find(p => p.id === settingsForm.homeBannerProductId);
+                                if (selectedProd && selectedProd.imageUrl) {
+                                  setSettingsForm(prev => ({ ...prev, homeBannerUrl: selectedProd.imageUrl }));
+                                }
+                              }}
+                              className="bg-pizza-gold/10 hover:bg-pizza-gold/20 text-[#ffd79b] text-[10px] font-bold px-3 py-1.5 rounded-lg border border-pizza-gold/20 flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Image size={10} />
+                              Usar Imagen de Producto
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSettingsForm(prev => ({ ...prev, homeBannerProductId: "" }))}
+                              className="bg-white/5 hover:bg-white/10 text-white/60 text-[10px] font-bold px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <X size={10} />
+                              Quitar Vínculo
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Vista Previa del Banner */}
+                      <div className="flex flex-col justify-end space-y-2">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40">Vista Previa del Banner</label>
+                        <div className="relative rounded-2xl overflow-hidden border border-white/10 w-full h-32 bg-black/40 flex items-center justify-center">
+                          {settingsForm.homeBannerUrl ? (
+                            <img 
+                              src={settingsForm.homeBannerUrl} 
+                              alt="Banner preview" 
+                              className="w-full h-full object-cover" 
+                            />
+                          ) : (
+                            <span className="text-[10px] text-white/20 italic">No hay imagen cargada para el banner</span>
+                          )}
+                          <div className="absolute top-2 right-2 bg-pizza-dark/80 backdrop-blur-md px-2 py-0.5 rounded text-[8px] text-white/80 border border-white/5">
+                            Previsualización
+                          </div>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   <button

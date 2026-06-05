@@ -279,9 +279,18 @@ export const ClientMenu = () => {
     }
   };
 
+  // Obtener información del producto vinculado al banner de inicio
+  const linkedProduct = businessConfig.homeBannerProductId
+    ? products.find((p) => p.id === businessConfig.homeBannerProductId)
+    : null;
+
+  const bannerImage = businessConfig.homeBannerUrl || (linkedProduct?.imageUrl) || "https://lh3.googleusercontent.com/aida-public/AB6AXuAYoGneI4pI-8Eb4DtGVQMxjlTNo52gDYIAxGrJNq7ksf6zNzl2jp2VhKCHFbDiYJHr1briONU3QRmwFZKtD4h27ye2k5Hc01jJ97ROubdyCKfeWPKE3rxXkuJO7G3uY3BE1vqJYN9CwKG20LfLvW0cDU5Umkv9PBK7tUGOyf6he8x7nDXZyuy726F5d90MYjywFlC-8ct19Tu8UIWdoTyv_53NgrsKstqNUc0gDUmMYV76Mhr0_vWv4XzjASfA5GfKvqyxNifhWWQ";
+
+  const bannerTitle = businessConfig.homeBannerTitle || (linkedProduct ? `¡Prueba nuestro/a ${linkedProduct.name}!` : "¡Descuentos Progresivos en todo el Menú!");
+
+  const bannerSubtitle = businessConfig.homeBannerSubtitle || (linkedProduct ? (linkedProduct.description || "Haz clic para ver los detalles y ordenar.") : "Ahorra automáticamente en tu total al agregar más productos.");
+
   const handleBannerClick = () => {
-    if (!businessConfig.homeBannerProductId) return;
-    const linkedProduct = products.find(p => p.id === businessConfig.homeBannerProductId);
     if (linkedProduct) {
       handleOpenCustomize(linkedProduct);
     }
@@ -537,74 +546,81 @@ export const ClientMenu = () => {
         <section className="px-6 pt-8 pb-4">
           <div 
             onClick={handleBannerClick}
-            className={`relative rounded-[32px] overflow-hidden border border-pizza-red/10 p-8 md:p-12 bg-gradient-to-br from-[#FFF5F1] to-white shadow-sm flex flex-col justify-between ${businessConfig.homeBannerProductId ? "cursor-pointer hover:shadow-md transition-all duration-300" : ""}`}
+            className={`relative rounded-[32px] overflow-hidden border border-pizza-red/10 p-8 md:p-12 bg-gradient-to-br from-[#FFF5F1] to-white shadow-sm flex flex-col justify-between ${linkedProduct ? "cursor-pointer hover:shadow-md transition-all duration-300" : ""}`}
           >
             <div className="max-w-2xl relative z-10 text-left">
               <span className="bg-pizza-red/10 border border-pizza-red/20 text-pizza-red text-[10px] font-bold px-4 py-1.5 rounded-full uppercase tracking-wider mb-6 inline-block">
-                Promociones Activas
+                {linkedProduct ? "Platillo Destacado" : "Promociones Activas"}
               </span>
               <h2 className="font-pizza-title text-3xl md:text-4xl font-extrabold text-pizza-dark leading-tight mb-4">
-                ¡Descuentos Progresivos en todo el Menú!
+                {bannerTitle}
               </h2>
-              <p className="text-sm text-pizza-dark/70 mb-8 leading-relaxed">
-                Ahorra automáticamente en tu total al agregar más productos. 
-                {couponCode ? (
-                  <> Tienes el cupón <strong className="text-pizza-red font-bold">{couponCode}</strong> activado para un descuento extra.</>
-                ) : (
-                  <> Usa un código de cupón disponible abajo para obtener descuentos adicionales.</>
-                )}
+              <p className="text-sm text-pizza-dark/70 mb-8 leading-relaxed max-w-lg">
+                {bannerSubtitle}
               </p>
 
-              {/* Progressive Discount Bar */}
-              {businessConfig.discounts?.autoDiscounts?.length > 0 && (
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs font-bold mb-2">
-                    <span className="text-pizza-red">Progreso del Descuento</span>
-                    <span className="text-pizza-dark/70">
-                      {totals.autoDiscountPercent > 0 
-                        ? `Llegaste a ${totals.autoDiscountPercent}% OFF` 
-                        : "Agrega productos para ganar descuento"}
-                    </span>
-                  </div>
-                  <div className="relative bg-gray-200 h-3 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-[#ff9e7d] to-[#ff5200] h-full rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${Math.min(100, (totals.subtotal / (Math.max(...businessConfig.discounts.autoDiscounts.map(d => d.minAmount)) || 1)) * 100)}%` }}
-                    />
-                    {/* Milestone markers */}
-                    {businessConfig.discounts.autoDiscounts.map((rule, idx, arr) => {
-                      const maxAmount = Math.max(...arr.map(d => d.minAmount)) || 1;
-                      const position = (rule.minAmount / maxAmount) * 100;
-                      if (position >= 100) return null;
-                      return (
-                        <div 
-                          key={idx} 
-                          className="absolute top-0 bottom-0 w-0.5 bg-white/70"
-                          style={{ left: `${position}%` }}
-                        />
-                      );
-                    })}
-                  </div>
-                  <div className="flex justify-between mt-2 text-[10px] uppercase font-bold tracking-wider text-pizza-dark/50">
-                    {businessConfig.discounts.autoDiscounts.map((rule, idx) => (
-                      <span 
-                        key={idx}
-                        className={totals.subtotal >= rule.minAmount ? "text-pizza-red" : ""}
-                      >
-                        &gt; {formatCurrency(rule.minAmount, businessConfig.currency)} ({rule.discountPercent}% OFF)
-                      </span>
-                    ))}
-                  </div>
+              {/* Progressive Discount Bar or CTA Button */}
+              {linkedProduct ? (
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    className="bg-pizza-red hover:bg-pizza-red/90 text-white font-extrabold text-xs px-6 py-3.5 rounded-2xl transition-all cursor-pointer shadow-lg shadow-pizza-red/20 uppercase tracking-wider inline-flex items-center gap-2 border-0 pointer-events-none keep-white"
+                  >
+                    Ver Especialidad
+                    <ChevronRight size={14} />
+                  </button>
                 </div>
+              ) : (
+                businessConfig.discounts?.autoDiscounts?.length > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between text-xs font-bold mb-2">
+                      <span className="text-pizza-red">Progreso del Descuento</span>
+                      <span className="text-pizza-dark/70">
+                        {totals.autoDiscountPercent > 0 
+                          ? `Llegaste a ${totals.autoDiscountPercent}% OFF` 
+                          : "Agrega productos para ganar descuento"}
+                      </span>
+                    </div>
+                    <div className="relative bg-gray-200 h-3 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-[#ff9e7d] to-[#ff5200] h-full rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${Math.min(100, (totals.subtotal / (Math.max(...businessConfig.discounts.autoDiscounts.map(d => d.minAmount)) || 1)) * 100)}%` }}
+                      />
+                      {/* Milestone markers */}
+                      {businessConfig.discounts.autoDiscounts.map((rule, idx, arr) => {
+                        const maxAmount = Math.max(...arr.map(d => d.minAmount)) || 1;
+                        const position = (rule.minAmount / maxAmount) * 100;
+                        if (position >= 100) return null;
+                        return (
+                          <div 
+                            key={idx} 
+                            className="absolute top-0 bottom-0 w-0.5 bg-white/70"
+                            style={{ left: `${position}%` }}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between mt-2 text-[10px] uppercase font-bold tracking-wider text-pizza-dark/50">
+                      {businessConfig.discounts.autoDiscounts.map((rule, idx) => (
+                        <span 
+                          key={idx}
+                          className={totals.subtotal >= rule.minAmount ? "text-pizza-red" : ""}
+                        >
+                          &gt; {formatCurrency(rule.minAmount, businessConfig.currency)} ({rule.discountPercent}% OFF)
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
               )}
             </div>
 
             {/* Abstract background shape */}
             <div className="absolute top-0 right-0 w-1/2 h-full hidden lg:block pointer-events-none select-none">
               <img 
-                className={`w-full h-full object-cover ${businessConfig.homeBannerUrl ? "opacity-95 rounded-r-[32px] [mask-image:linear-gradient(to_right,transparent,black_15%)]" : "opacity-12 mix-blend-multiply"}`} 
-                alt="Pizza Gourmet"
-                src={businessConfig.homeBannerUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuAYoGneI4pI-8Eb4DtGVQMxjlTNo52gDYIAxGrJNq7ksf6zNzl2jp2VhKCHFbDiYJHr1briONU3QRmwFZKtD4h27ye2k5Hc01jJ97ROubdyCKfeWPKE3rxXkuJO7G3uY3BE1vqJYN9CwKG20LfLvW0cDU5Umkv9PBK7tUGOyf6he8x7nDXZyuy726F5d90MYjywFlC-8ct19Tu8UIWdoTyv_53NgrsKstqNUc0gDUmMYV76Mhr0_vWv4XzjASfA5GfKvqyxNifhWWQ"}
+                className={`w-full h-full object-cover ${(businessConfig.homeBannerUrl || linkedProduct?.imageUrl) ? "opacity-95 rounded-r-[32px] [mask-image:linear-gradient(to_right,transparent,black_15%)]" : "opacity-12 mix-blend-multiply"}`} 
+                alt="Banner Especial"
+                src={bannerImage}
               />
             </div>
           </div>
@@ -850,56 +866,68 @@ export const ClientMenu = () => {
               {/* Gran Banner de bienvenida con Descuentos Progresivos de Stitch */}
               <div 
                 onClick={handleBannerClick}
-                className={`relative w-full min-h-[220px] rounded-3xl overflow-hidden shadow-lg group ${businessConfig.homeBannerProductId ? "cursor-pointer" : ""}`}
+                className={`relative w-full min-h-[220px] rounded-3xl overflow-hidden shadow-lg group ${linkedProduct ? "cursor-pointer" : ""}`}
               >
                 <img 
-                  alt="Deliciosa pizza artesanal" 
+                  alt="Imagen del Banner" 
                   className="absolute inset-0 w-full h-full object-cover" 
-                  src={businessConfig.homeBannerUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuBs46Wx6T7dbCuHdmrk990u3VpzK3Z0k1Lw1eeWIJRVqQfvpORp7_sb3Ut0mt5m54LhcJCgiCiz4PHRQyYW73mtR_CdPMMJnqpuGuECnK_puKRdBWgg56GFptmJF4PQ3hnbpCwYAHG9kaE60zvYdaMOwkelkCm7VBoL_ZckV92asnakI2pfAgx01t8hf0zrcs7_12Rp8KroE1WgnJn9i9T985WOgGXgEsHKnV7hKcyKz-90Ok5N91UaXfBP581_k9tTmTUOBeuiU6s"}
+                  src={bannerImage}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent flex flex-col justify-end p-5 text-left">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-5 text-left">
                   <span className="text-white/80 font-bold text-[9px] uppercase tracking-widest mb-1 keep-white">
-                    Tu Próximo Nivel
+                    {linkedProduct ? "Recomendado" : "Tu Próximo Nivel"}
                   </span>
-                  <h2 className="text-white font-pizza-title text-xl font-black mb-3 keep-white">
-                    Descuentos Progresivos
+                  <h2 className="text-white font-pizza-title text-lg font-black mb-2 leading-tight keep-white">
+                    {bannerTitle}
                   </h2>
                   
-                  {businessConfig.discounts?.autoDiscounts?.length > 0 ? (
+                  {linkedProduct ? (
                     <div className="space-y-2">
-                      <div className="flex justify-between items-end text-white text-[10px] font-bold keep-white">
-                        <span>
-                          {totals.autoDiscountPercent > 0 
-                            ? `¡Llegaste a ${totals.autoDiscountPercent}% OFF!` 
-                            : "Agrega productos para ganar descuento"}
-                        </span>
-                        <span>
-                          {totals.autoDiscountPercent > 0 
-                            ? `${totals.autoDiscountPercent}%` 
-                            : "0%"}
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-white/20 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-orange-400 to-pizza-red rounded-full transition-all duration-500 ease-out shadow-[0_0_12px_rgba(255,102,0,0.5)]"
-                          style={{ width: `${Math.min(100, (totals.subtotal / (Math.max(...businessConfig.discounts.autoDiscounts.map(d => d.minAmount)) || 1)) * 100)}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[8px] uppercase font-bold tracking-wider text-white/50 keep-white">
-                        {businessConfig.discounts.autoDiscounts.map((rule, idx) => (
-                          <span 
-                            key={idx}
-                            className={totals.subtotal >= rule.minAmount ? "text-pizza-red font-black" : ""}
-                          >
-                            &gt; {formatCurrency(rule.minAmount, businessConfig.currency)} ({rule.discountPercent}% OFF)
-                          </span>
-                        ))}
-                      </div>
+                      <p className="text-white/70 text-[10px] leading-relaxed line-clamp-2 keep-white">
+                        {bannerSubtitle}
+                      </p>
+                      <span className="inline-flex items-center gap-1 text-pizza-gold text-[9px] font-black uppercase tracking-wider mt-1.5">
+                        Ver Especialidad
+                        <ChevronRight size={10} />
+                      </span>
                     </div>
                   ) : (
-                    <p className="text-white/70 text-xs leading-tight keep-white">
-                      Ahorra automáticamente en tu total al agregar más productos.
-                    </p>
+                    businessConfig.discounts?.autoDiscounts?.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-end text-white text-[10px] font-bold keep-white">
+                          <span>
+                            {totals.autoDiscountPercent > 0 
+                              ? `¡Llegaste a ${totals.autoDiscountPercent}% OFF!` 
+                              : "Agrega productos para ganar descuento"}
+                          </span>
+                          <span>
+                            {totals.autoDiscountPercent > 0 
+                              ? `${totals.autoDiscountPercent}%` 
+                              : "0%"}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-white/20 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-orange-400 to-pizza-red rounded-full transition-all duration-500 ease-out shadow-[0_0_12px_rgba(255,102,0,0.5)]"
+                            style={{ width: `${Math.min(100, (totals.subtotal / (Math.max(...businessConfig.discounts.autoDiscounts.map(d => d.minAmount)) || 1)) * 100)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[8px] uppercase font-bold tracking-wider text-white/50 keep-white">
+                          {businessConfig.discounts.autoDiscounts.map((rule, idx) => (
+                            <span 
+                              key={idx}
+                              className={totals.subtotal >= rule.minAmount ? "text-pizza-red font-black" : ""}
+                            >
+                              &gt; {formatCurrency(rule.minAmount, businessConfig.currency)} ({rule.discountPercent}% OFF)
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-white/70 text-xs leading-tight keep-white">
+                        {bannerSubtitle}
+                      </p>
+                    )
                   )}
                 </div>
               </div>
