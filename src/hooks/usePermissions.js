@@ -15,6 +15,8 @@ export function usePermissions(userRole, userCustomPermissions) {
    * @returns {boolean} True si tiene acceso, false en caso contrario.
    */
   const hasPermission = (permission) => {
+    // El administrador del restaurante siempre tiene acceso completo (incluye permisos nuevos)
+    if (userRole === "admin") return true;
     const allowedPermissions = Array.isArray(userCustomPermissions)
       ? userCustomPermissions
       : (ROLES_PERMISSIONS[userRole] || []);
@@ -28,6 +30,7 @@ export function usePermissions(userRole, userCustomPermissions) {
    * @returns {boolean} True si posee al menos un permiso.
    */
   const hasAnyPermission = (permissionsArray) => {
+    if (userRole === "admin") return true;
     const allowedPermissions = Array.isArray(userCustomPermissions)
       ? userCustomPermissions
       : (ROLES_PERMISSIONS[userRole] || []);

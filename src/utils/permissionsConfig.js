@@ -46,7 +46,13 @@ export const PERMISSIONS = {
   CONFIGURAR_TIENDA: "tienda:configurar",
 
   // Cocina
-  ACCESO_COCINA: "cocina:acceso"
+  ACCESO_COCINA: "cocina:acceso",
+
+  // Recibos emitidos y compras de insumos
+  VER_RECIBOS: "recibos:ver",
+  ANULAR_VENTA: "ventas:anular",
+  VER_COMPRAS: "compras:ver",
+  REGISTRAR_COMPRA: "compras:registrar"
 };
 
 export const ROLES_PERMISSIONS = {
@@ -61,7 +67,8 @@ export const ROLES_PERMISSIONS = {
     PERMISSIONS.VER_HISTORIAL_TURNOS,
     PERMISSIONS.VER_CLIENTES,
     PERMISSIONS.VER_MESAS,
-    PERMISSIONS.EDITAR_MESAS // Permitir cambiar estado de mesa (libre/ocupada)
+    PERMISSIONS.EDITAR_MESAS, // Permitir cambiar estado de mesa (libre/ocupada)
+    PERMISSIONS.VER_RECIBOS
   ],
   cook: [
     PERMISSIONS.VER_PEDIDOS,

@@ -22,7 +22,7 @@ import { SoundNotification } from "../components/SoundNotification";
 import { TicketTemplate } from "../components/TicketTemplate";
 import { POSView } from "./POSView";
 import { CookView } from "./CookView";
-import { PanelLeft, LayoutGrid, Wallet, Clock, ChevronDown, CheckCircle2, X, Settings, LogOut, Loader2, ClipboardList, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, Plus, Trash2, Menu, Lock, FileText, Search, Store, Sun, Moon, ChevronsLeft, TrendingUp, Tag, Table, ChefHat, Calendar } from "lucide-react";
+import { ReceiptText, ShoppingCart, PanelLeft, LayoutGrid, Wallet, Clock, ChevronDown, CheckCircle2, X, Settings, LogOut, Loader2, ClipboardList, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, Plus, Trash2, Menu, Lock, FileText, Search, Store, Sun, Moon, ChevronsLeft, TrendingUp, Tag, Table, ChefHat, Calendar } from "lucide-react";
 
 import { usePermissions } from "../hooks/usePermissions";
 import { useTheme } from "../hooks/useTheme";
@@ -35,6 +35,8 @@ import { FinanzasTab } from "./admin/FinanzasTab";
 import { InventarioTab } from "./admin/InventarioTab";
 import { CategoriasTab } from "./admin/CategoriasTab";
 import { MesasTab } from "./admin/MesasTab";
+import { RecibosTab } from "./admin/RecibosTab";
+import { ComprasTab } from "./admin/ComprasTab";
 import { ContactosTab } from "./admin/ContactosTab";
 import { PersonalTab } from "./admin/PersonalTab";
 import { CajaTab } from "./admin/CajaTab";
@@ -2052,8 +2054,10 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     { id: "pedidos", label: "Pedidos Activos", icon: ClipboardList, permission: PERMISSIONS.VER_PEDIDOS },
     { id: "cocina", label: "Cocina KDS", icon: ChefHat, permission: PERMISSIONS.ACCESO_COCINA },
     { id: "pos", label: "POS Caja", icon: Store, permission: PERMISSIONS.ACCESO_POS },
+    { id: "recibos", label: "Recibos Emitidos", icon: ReceiptText, permission: PERMISSIONS.VER_RECIBOS },
     { id: "ventas", label: "Reporte Ventas", icon: BarChart3, permission: PERMISSIONS.VER_VENTAS },
     { id: "finanzas", label: "Resultados Financieros", icon: TrendingUp, permission: PERMISSIONS.VER_FINANZAS },
+    { id: "compras", label: "Compras e Insumos", icon: ShoppingCart, permission: PERMISSIONS.VER_COMPRAS },
     { id: "inventario", label: "Inventario CRUD", icon: Package, permission: PERMISSIONS.VER_INVENTARIO },
     { id: "categorias", label: "Categorías", icon: Tag, permission: PERMISSIONS.VER_INVENTARIO },
     { id: "mesas", label: "Gestión Mesas", icon: Table, permission: PERMISSIONS.VER_MESAS },
@@ -2534,6 +2538,25 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
             )}
 
             {/* TAB CONTENT: GESTION DE MESAS */}
+            {activeTab === "recibos" && hasPermission(PERMISSIONS.VER_RECIBOS) && (
+              <RecibosTab
+                businessConfig={businessConfig}
+                canVoid={hasPermission(PERMISSIONS.ANULAR_VENTA)}
+                user={user}
+                logAuditEvent={logAuditEvent}
+              />
+            )}
+
+            {activeTab === "compras" && hasPermission(PERMISSIONS.VER_COMPRAS) && (
+              <ComprasTab
+                productsList={productsList}
+                businessConfig={businessConfig}
+                user={user}
+                logAuditEvent={logAuditEvent}
+                canRegister={hasPermission(PERMISSIONS.REGISTRAR_COMPRA)}
+              />
+            )}
+
             {activeTab === "mesas" && hasPermission(PERMISSIONS.VER_MESAS) && (
               <MesasTab
                 tablesList={tablesList}

@@ -83,6 +83,9 @@ service cloud.firestore {
       match /sales/{id} {
         allow read, create, update: if isStaffOf(rid);
       }
+      match /purchases/{id} {
+        allow read, write: if isStaffOf(rid);
+      }
       match /events/{id} {
         allow read: if true;
         allow write: if isStaffOf(rid);

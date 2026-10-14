@@ -602,7 +602,13 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
       taxBase: payment.taxBase,
       taxAmount: payment.taxAmount,
       payments: payment.payments,
+      primaryMethod,
       change: payment.change,
+      serviceMode: newOrder?.serviceMode || ctx.bill?.orders?.[0]?.serviceMode || serviceMode,
+      items: paidOrders.flatMap((o) => o.items || []).map((it) => ({ name: it.name, quantity: it.quantity, price: Number(it.price || 0), note: it.note || "" })),
+      customerPhone: paidOrders[0]?.customerPhone || "",
+      customerAddress: paidOrders[0]?.customerAddress || "",
+      status: "valid",
       cashier: user.email,
       createdAt: serverTimestamp()
     });
