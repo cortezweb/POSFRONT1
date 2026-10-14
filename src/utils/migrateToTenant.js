@@ -58,9 +58,10 @@ export const migrateLegacyData = async ({ restaurantName, onProgress } = {}) => 
   log(`usuarios: ${assigned} asignados a "${rid}"`);
 
   // Ficha del restaurante
+  // (con las reglas actuales solo el dueño de GloryChef puede crearla; si falla, se omite)
   const restaurantRef = doc(db, "restaurants", rid);
   const existing = await getDoc(restaurantRef);
-  if (!existing.exists()) {
+  if (!existing.exists()) try {
     await setDoc(restaurantRef, {
       name: restaurantName || rid,
       slug: rid,
@@ -69,6 +70,8 @@ export const migrateLegacyData = async ({ restaurantName, onProgress } = {}) => 
       createdAt: serverTimestamp()
     });
     log(`restaurante "${rid}" creado`);
+  } catch {
+    log(`ficha del restaurante "${rid}" pendiente (la crea el dueño de GloryChef)`);
   }
 
   return report;

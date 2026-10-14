@@ -106,6 +106,30 @@ export const ConfiguracionTab = ({
       </div>
 
       <div>
+        <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Color de la Marca</label>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="color"
+            value={settingsForm.brandColor || "#ff5200"}
+            onChange={(e) => setSettingsForm(prev => ({ ...prev, brandColor: e.target.value }))}
+            className="w-12 h-10 rounded-xl bg-transparent border border-white/10 cursor-pointer"
+            aria-label="Elegir color de la marca"
+          />
+          {["#ff5200", "#16a34a", "#dc2626", "#2563eb", "#7c3aed", "#db2777", "#0d9488", "#ca8a04"].map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setSettingsForm(prev => ({ ...prev, brandColor: c }))}
+              className={`w-8 h-8 rounded-full border-2 cursor-pointer ${ (settingsForm.brandColor || "#ff5200") === c ? "border-white/80 scale-110" : "border-transparent" }`}
+              style={{ backgroundColor: c }}
+              aria-label={`Usar color ${c}`}
+            />
+          ))}
+          <span className="text-[10px] text-white/40">Se aplica a botones, menú lateral y al menú de clientes.</span>
+        </div>
+      </div>
+
+      <div>
         <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">QR de Yape / Plin (Método de Pago)</label>
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
           <div className="flex-1 w-full space-y-2">

@@ -29,17 +29,27 @@ service cloud.firestore {
       return isStaffUser() && myRestaurant() == rid;
     }
     function isAdminOf(rid) {
-      return isStaffOf(rid) && me().role == 'admin';
+      return (isStaffOf(rid) && me().role == 'admin') || isSuperAdmin();
+    }
+    // Dueño de GloryChef: crea y controla los restaurantes clientes
+    function isSuperAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && me().role == 'superadmin';
     }
 
     match /restaurants/{rid} {
       // Ficha del restaurante (nombre, plan, estado)
       allow read: if true;
-      allow create, update: if isAdminOf(rid);
+      // Solo el dueño de GloryChef crea restaurantes o cambia plan, estado y vencimiento
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin()
+        || (isAdminOf(rid)
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'active', 'trialEndsAt', 'slug']));
 
       match /config/{docId} {
         allow read: if true;
-        allow write: if isStaffOf(rid);
+        allow write: if isStaffOf(rid) || isSuperAdmin();
       }
 
       match /products/{id} {
@@ -96,11 +106,14 @@ service cloud.firestore {
     // Personal
     match /users/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isAdminOf(resource.data.get('restaurantId', 'glorychef')));
-      allow list: if signedIn() && isAdminOf(resource.data.restaurantId);
+      allow list: if signedIn() && (isSuperAdmin() || isAdminOf(resource.data.restaurantId));
       // Crear/editar personal solo dentro del propio restaurante
-      allow create: if isAdminOf(request.resource.data.restaurantId);
-      allow update: if isAdminOf(resource.data.get('restaurantId', 'glorychef'))
-        && request.resource.data.get('restaurantId', 'glorychef') == myRestaurant();
+      allow create: if isSuperAdmin()
+        || (isAdminOf(request.resource.data.restaurantId) && request.resource.data.role != 'superadmin');
+      allow update: if isSuperAdmin()
+        || (isAdminOf(resource.data.get('restaurantId', 'glorychef'))
+            && request.resource.data.get('restaurantId', 'glorychef') == myRestaurant()
+            && request.resource.data.role != 'superadmin');
       allow delete: if isAdminOf(resource.data.get('restaurantId', 'glorychef'));
     }
 

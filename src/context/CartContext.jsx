@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { rDoc, useRestaurantId } from "../firebase/tenant";
 import { onSnapshot } from "firebase/firestore";
 import { getProductPriceWithExtras } from "../utils/formatters";
+import { applyBranding } from "../utils/branding";
 
 const CartContext = createContext();
 
@@ -56,10 +57,11 @@ export const CartProvider = ({ children }) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setBusinessConfig(data);
+        applyBranding(data);
         
         // Actualizar título de la pestaña del navegador dinámicamente en todo el proyecto
         if (data.name) {
-          document.title = `${data.name} | Menú Digital & POS Express`;
+          document.title = `${data.name} | Menú Digital & POS`;
           
           // Actualizar meta-descripción dinámicamente para mejorar SEO en todo el proyecto
           const metaDesc = document.querySelector('meta[name="description"]');

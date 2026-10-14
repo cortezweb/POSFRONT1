@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth, firebaseError } from "./firebase/config";
 import { onAuthStateChanged } from "firebase/auth";
-import { getUserData } from "./firebase/auth";
+import { getUserData, logoutUser } from "./firebase/auth";
 import { setRestaurantId, resolveRestaurantFromUrl, DEFAULT_RESTAURANT_ID } from "./firebase/tenant";
 import { CartProvider } from "./context/CartContext";
 
@@ -13,6 +13,10 @@ import { AdminView } from "./views/AdminView";
 import { CookView } from "./views/CookView";
 import { OrderTrackingView } from "./views/OrderTrackingView";
 import { TestBNBView } from "./views/TestBNBView";
+import { SuperAdminView } from "./views/SuperAdminView";
+import { db } from "./firebase/config";
+import { doc, getDoc } from "firebase/firestore";
+import { getRestaurantStatus } from "./utils/restaurantStatus";
 
 import { Loader2 } from "lucide-react";
 import "./App.css";
@@ -21,6 +25,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [permissions, setPermissions] = useState(null);
+  const [restaurantInfo, setRestaurantInfo] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [currentPath, setCurrentPath] = useState(window.location.hash || "#/");
 
@@ -38,7 +43,17 @@ function App() {
           const userData = await getUserData(currentUser.uid);
           if (userData) {
             // El restaurante activo debe fijarse antes de montar el panel
-            setRestaurantId(userData.restaurantId || DEFAULT_RESTAURANT_ID);
+            const rid = userData.restaurantId || DEFAULT_RESTAURANT_ID;
+            setRestaurantId(rid);
+            // Ficha del restaurante (plan, activo, vencimiento de la prueba)
+            if (userData.role !== "superadmin") {
+              try {
+                const rSnap = await getDoc(doc(db, "restaurants", rid));
+                setRestaurantInfo(rSnap.exists() ? rSnap.data() : null);
+              } catch {
+                setRestaurantInfo(null);
+              }
+            }
             setRole(userData.role);
             setPermissions(userData.permissions || null);
           } else {
@@ -97,6 +112,27 @@ function App() {
       }
 
       if (user) {
+        if (role === "superadmin") {
+          return <SuperAdminView user={user} onLogout={handleLogout} />;
+        }
+        const restaurantStatus = getRestaurantStatus(restaurantInfo);
+        if ((role === "admin" || role === "cashier" || role === "cook") && !restaurantStatus.ok) {
+          return (
+            <div className="min-h-screen bg-pizza-dark text-white flex flex-col items-center justify-center p-6 text-center">
+              <span className="text-4xl mb-4">🔒</span>
+              <h2 className="text-xl font-bold mb-2">{restaurantStatus.label}</h2>
+              <p className="text-sm text-white/60 max-w-sm mb-6">
+                El acceso de {restaurantInfo?.name || "este restaurante"} a GloryChef está pausado. Comunícate con GloryChef para reactivar tu plan.
+              </p>
+              <button
+                onClick={async () => { await logoutUser(); handleLogout(); }}
+                className="bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl px-6 py-2.5 text-xs font-bold transition-all cursor-pointer"
+              >
+                Salir
+              </button>
+            </div>
+          );
+        }
         if (role === "admin" || role === "cashier" || role === "cook") {
           return <AdminView user={user} role={role} permissions={permissions} onLogout={handleLogout} />;
         } else {
