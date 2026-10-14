@@ -4,6 +4,7 @@ import { useCart } from "../context/CartContext";
 import { getDocs, addDoc, setDoc, runTransaction, serverTimestamp, query, where, onSnapshot, updateDoc, increment, orderBy } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { PaymentModal } from "../components/pos/PaymentModal";
+import { SaleReceiptModal } from "../components/pos/SaleReceiptModal";
 import { formatCurrency, parseComboItem, getProductPriceWithExtras, getOptionPriceAdjustment } from "../utils/formatters";
 import { MapboxSearch } from "../components/MapboxSearch";
 import { 
@@ -51,6 +52,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const [openOrders, setOpenOrders] = useState([]);
   const [isAccountsOpen, setIsAccountsOpen] = useState(false);
   const [paymentContext, setPaymentContext] = useState(null);
+  const [saleReceipt, setSaleReceipt] = useState(null);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
@@ -100,8 +102,8 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const [printJob, setPrintJob] = useState(null);
   const [printSize, setPrintSize] = useState("80mm");
 
-  const printDocument = (type, data) => {
-    setPrintJob({ type, data });
+  const printDocument = (type, data, size) => {
+    setPrintJob({ type, data, size });
     setTimeout(() => {
       window.print();
     }, 250);
@@ -612,24 +614,32 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
       if (table) updateDoc(rDoc("tables", table.id), { status: "libre" }).catch(() => {});
     }
 
-    // 5. Comprobante
+    // 5. Recibo de venta (ventana con imprimir, WhatsApp y PDF)
     const allItems = paidOrders.flatMap((o) => o.items || []);
-    triggerPrint({
-      orderNumber: receiptNumber,
+    const firstOrder = paidOrders[0] || {};
+    setSaleReceipt({
+      receiptNumber,
       receiptType: payment.receiptType,
-      customerName: payment.customer.id ? payment.customer.name : (ctx.label || "Clientes Varios"),
-      customerPhone: "",
-      customerDoc: payment.customer.docNumber !== "0" ? `${payment.customer.docType} ${payment.customer.docNumber}` : "",
-      serviceMode: newOrder?.serviceMode || ctx.bill?.orders?.[0]?.serviceMode || serviceMode,
+      createdAtMs: Date.now(),
+      customer: {
+        ...payment.customer,
+        name: payment.customer.id ? payment.customer.name : (firstOrder.serviceMode !== "dinein" && firstOrder.customerName) || "Clientes Varios",
+        phone: payment.customer.phone || firstOrder.customerPhone || "",
+        address: firstOrder.customerAddress || ""
+      },
+      customerPhone: firstOrder.customerPhone || "",
+      serviceMode: newOrder?.serviceMode || firstOrder.serviceMode || serviceMode,
       tableNumber: tableName,
-      paymentMethod: primaryMethod,
-      items: allItems,
+      items: allItems.map((it) => ({ name: it.name, quantity: it.quantity, price: Number(it.price || 0), note: it.note || "" })),
       subtotal: allItems.reduce((n, i) => n + Number(i.price || 0) * i.quantity, 0),
-      discountAmount: Math.round((ctx.amount - payment.total) * 100) / 100,
+      discount: Math.round((ctx.amount - payment.total) * 100) / 100,
+      taxBase: payment.taxBase,
       taxAmount: payment.taxAmount,
       shippingCost: paidOrders.reduce((n, o) => n + Number(o.shippingCost || 0), 0),
       total: payment.total,
-      createdAt: { seconds: Math.floor(Date.now() / 1000) }
+      payments: payment.payments,
+      change: payment.change,
+      primaryMethod
     });
 
     if (newOrder) {
@@ -1690,6 +1700,32 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
         </div>
       )}
 
+      {saleReceipt && (
+        <SaleReceiptModal
+          receipt={saleReceipt}
+          businessConfig={businessConfig}
+          onClose={() => setSaleReceipt(null)}
+          onPrint={(kind) => printDocument("receipt", {
+            orderNumber: saleReceipt.receiptNumber,
+            receiptType: saleReceipt.receiptType,
+            customerName: saleReceipt.customer.name,
+            customerPhone: saleReceipt.customer.phone || "",
+            customerDoc: saleReceipt.customer.docNumber && saleReceipt.customer.docNumber !== "0" ? `${saleReceipt.customer.docType} ${saleReceipt.customer.docNumber}` : "",
+            serviceMode: saleReceipt.serviceMode,
+            tableNumber: saleReceipt.tableNumber,
+            customerAddress: saleReceipt.customer.address,
+            paymentMethod: saleReceipt.primaryMethod,
+            items: saleReceipt.items,
+            subtotal: saleReceipt.subtotal,
+            discountAmount: saleReceipt.discount,
+            taxAmount: saleReceipt.taxAmount,
+            shippingCost: saleReceipt.shippingCost,
+            total: saleReceipt.total,
+            createdAt: { seconds: Math.floor(saleReceipt.createdAtMs / 1000) }
+          }, kind === "letter" ? "letter" : undefined)}
+        />
+      )}
+
       {paymentContext && (
         <PaymentModal
           amountDue={paymentContext.amount}
@@ -1712,7 +1748,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
             total: printJob.data.total || 0
           }}
           config={businessConfig}
-          printSize={printSize}
+          printSize={printJob.size || printSize}
         />
       )}
       {printJob?.type === "comanda" && <KitchenTicket order={printJob.data} printSize={printSize} />}

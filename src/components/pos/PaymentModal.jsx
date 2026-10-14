@@ -107,7 +107,7 @@ export const PaymentModal = ({ amountDue, businessConfig, title = "Procesar pago
     setSaving(true);
     try {
       await onConfirm({
-        customer: { id: customer.id, name: customer.name, docType: customer.docType || "CI/NIT", docNumber: customer.docNumber || "0" },
+        customer: { id: customer.id, name: customer.name, docType: customer.docType || "CI/NIT", docNumber: customer.docNumber || "0", phone: customer.phone || "" },
         receiptType,
         serie,
         discountPercent: discount,
@@ -131,7 +131,7 @@ export const PaymentModal = ({ amountDue, businessConfig, title = "Procesar pago
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
-      <div className="w-full sm:max-w-md max-h-[96vh] bg-[#181818] border border-white/10 sm:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col text-left">
+      <div className="w-full sm:max-w-md max-h-[96vh] bg-[#181818] text-white border border-white/10 sm:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col text-left">
         {/* Encabezado */}
         <div className="flex items-center justify-between p-5 pb-3">
           <div className="flex items-center gap-3">
