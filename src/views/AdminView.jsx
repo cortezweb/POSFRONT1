@@ -2511,6 +2511,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
             {/* TAB CONTENT: INVENTARIO CRUD */}
             {activeTab === "inventario" && hasPermission(PERMISSIONS.VER_INVENTARIO) && (
               <InventarioTab
+                productsList={productsList}
                 businessConfig={businessConfig}
                 categoriesListToUse={categoriesListToUse}
                 filteredInventory={filteredInventory}
