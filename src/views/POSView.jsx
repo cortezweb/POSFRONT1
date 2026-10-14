@@ -388,7 +388,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const totals = getTotals();
 
   return (
-    <div className={isEmbedded ? "w-full h-[calc(100vh-80px)] overflow-hidden" : "min-h-screen bg-pizza-dark text-white"}>
+    <div className={isEmbedded ? "w-full h-[calc(100vh-96px)] md:h-[calc(100vh-128px)] overflow-hidden" : "min-h-screen bg-pizza-dark text-white"}>
       
       {/* -------------------- INTERFAZ DESKTOP (MD y superior) -------------------- */}
       <div className={`hidden md:flex flex-row w-full h-full ${isEmbedded ? "min-h-full" : "min-h-screen"}`}>
@@ -814,7 +814,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
       </div>
 
       {/* -------------------- INTERFAZ MÓVIL (Menor a MD) -------------------- */}
-      <div className={`md:hidden flex flex-col pb-16 ${isEmbedded ? "h-[calc(100vh-80px)] overflow-y-auto" : "min-h-screen bg-pizza-dark text-white"}`}>
+      <div className={`md:hidden flex flex-col pb-16 ${isEmbedded ? "h-[calc(100vh-96px)] overflow-y-auto" : "min-h-screen bg-pizza-dark text-white"}`}>
         {/* Cabecera Móvil del POS */}
         <header className="sticky top-0 z-40 bg-pizza-dark/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-1.5">

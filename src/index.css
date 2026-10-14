@@ -125,3 +125,102 @@ html, body {
 }
 
 
+
+/* =========================================================
+   Modo claro del panel interno (Admin / POS / Cocina)
+   El panel está construido con utilidades oscuras; en modo
+   claro se reasignan aquí sin tocar cada componente.
+   ========================================================= */
+.admin-shell[data-theme="light"] {
+  --light-bg: #f4f4f7;
+  --light-surface: #ffffff;
+  --light-surface-2: #f7f7f9;
+  --light-text: #1a1c1c;
+  color-scheme: light;
+  color: var(--light-text);
+}
+.admin-shell[data-theme="dark"] {
+  color-scheme: dark;
+  --chart-text: rgba(255, 255, 255, 0.55);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-bg-track: rgba(255, 255, 255, 0.06);
+}
+
+/* Fondos */
+.admin-shell[data-theme="light"],
+.admin-shell[data-theme="light"] .bg-pizza-dark,
+.admin-shell[data-theme="light"] .bg-\[\#161616\],
+.admin-shell[data-theme="light"] .bg-\[\#141414\] { background-color: var(--light-bg); }
+.admin-shell[data-theme="light"] .bg-pizza-dark\/95,
+.admin-shell[data-theme="light"] .bg-pizza-dark\/80,
+.admin-shell[data-theme="light"] .bg-\[\#141414\]\/90 { background-color: rgba(255, 255, 255, 0.92); }
+.admin-shell[data-theme="light"] .bg-pizza-dark\/60,
+.admin-shell[data-theme="light"] .bg-pizza-dark\/40,
+.admin-shell[data-theme="light"] .bg-pizza-dark\/25 { background-color: rgba(0, 0, 0, 0.04); }
+.admin-shell[data-theme="light"] aside.bg-pizza-dark,
+.admin-shell[data-theme="light"] .bg-\[\#181818\],
+.admin-shell[data-theme="light"] .bg-\[\#1a1a1a\],
+.admin-shell[data-theme="light"] .bg-\[\#1c1c1c\],
+.admin-shell[data-theme="light"] .bg-\[\#202020\] { background-color: var(--light-surface); }
+.admin-shell[data-theme="light"] .bg-\[\#181818\]\/60,
+.admin-shell[data-theme="light"] .bg-\[\#181818\]\/40,
+.admin-shell[data-theme="light"] .bg-\[\#1a1a1a\]\/40 { background-color: rgba(255, 255, 255, 0.7); }
+.admin-shell[data-theme="light"] .bg-\[\#121212\],
+.admin-shell[data-theme="light"] .bg-\[\#111111\],
+.admin-shell[data-theme="light"] .bg-\[\#101010\] { background-color: var(--light-surface-2); }
+.admin-shell[data-theme="light"] .bg-white\/5,
+.admin-shell[data-theme="light"] .hover\:bg-white\/5:hover,
+.admin-shell[data-theme="light"] .hover\:bg-white\/\[0\.01\]:hover,
+.admin-shell[data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(0, 0, 0, 0.045); }
+.admin-shell[data-theme="light"] .bg-white\/10,
+.admin-shell[data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(0, 0, 0, 0.08); }
+.admin-shell[data-theme="light"] .from-\[\#181818\],
+.admin-shell[data-theme="light"] .from-\[\#1c1c1c\] { --tw-gradient-from: #ffffff; }
+.admin-shell[data-theme="light"] .to-\[\#121212\] { --tw-gradient-to: #f4f4f7; }
+
+/* Paneles de vidrio */
+.admin-shell[data-theme="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.07) !important;
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Textos */
+.admin-shell[data-theme="light"] .text-white,
+.admin-shell[data-theme="light"] .hover\:text-white:hover { color: var(--light-text); }
+.admin-shell[data-theme="light"] .text-white\/80,
+.admin-shell[data-theme="light"] .hover\:text-white\/80:hover { color: rgba(26, 28, 28, 0.85); }
+.admin-shell[data-theme="light"] .text-white\/70 { color: rgba(26, 28, 28, 0.75); }
+.admin-shell[data-theme="light"] .text-white\/60,
+.admin-shell[data-theme="light"] .text-white\/55 { color: rgba(26, 28, 28, 0.65); }
+.admin-shell[data-theme="light"] .text-white\/50 { color: rgba(26, 28, 28, 0.58); }
+.admin-shell[data-theme="light"] .text-white\/40,
+.admin-shell[data-theme="light"] .text-white\/35 { color: rgba(26, 28, 28, 0.5); }
+.admin-shell[data-theme="light"] .text-white\/30,
+.admin-shell[data-theme="light"] .text-white\/20 { color: rgba(26, 28, 28, 0.4); }
+.admin-shell[data-theme="light"] .text-\[\#ffd79b\],
+.admin-shell[data-theme="light"] .text-\[\#ffd79b\]\/80 { color: #b45309; }
+.admin-shell[data-theme="light"] .text-emerald-400 { color: #059669; }
+.admin-shell[data-theme="light"] .text-amber-400 { color: #b45309; }
+.admin-shell[data-theme="light"] .text-red-400 { color: #dc2626; }
+.admin-shell[data-theme="light"] .placeholder-white\/20::placeholder { color: rgba(26, 28, 28, 0.35); }
+
+/* Botones con fondo de color: el texto blanco se mantiene blanco */
+.admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-pizza-gold, .bg-emerald-500, .bg-emerald-600, .bg-red-500, .bg-red-600, .bg-blue-500, .bg-blue-600, .bg-green-500, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-black, .bg-black\/85, .bg-black\/80, .bg-black\/75).text-white,
+.admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-pizza-gold, .bg-emerald-500, .bg-emerald-600, .bg-red-500, .bg-red-600, .bg-blue-500, .bg-blue-600, .bg-green-500, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-black) :is(.text-white, .text-white\/80, .text-white\/70, .text-white\/60, .text-white\/50) { color: #ffffff; }
+.admin-shell[data-theme="light"] .bg-\[\#ffd79b\] { background-color: #fbbf24; }
+
+/* Bordes */
+.admin-shell[data-theme="light"] .border-white\/5,
+.admin-shell[data-theme="light"] .divide-white\/5 > :not(:last-child) { border-color: rgba(0, 0, 0, 0.08); }
+.admin-shell[data-theme="light"] .border-white\/10,
+.admin-shell[data-theme="light"] .hover\:border-white\/10:hover { border-color: rgba(0, 0, 0, 0.12); }
+.admin-shell[data-theme="light"] .border-white\/15,
+.admin-shell[data-theme="light"] .hover\:border-white\/15:hover { border-color: rgba(0, 0, 0, 0.16); }
+.admin-shell[data-theme="light"] .border-white\/25,
+.admin-shell[data-theme="light"] .border-white\/40,
+.admin-shell[data-theme="light"] .hover\:border-white\/25:hover { border-color: rgba(0, 0, 0, 0.25); }
+.admin-shell[data-theme="light"] .border-\[\#141414\] { border-color: #ffffff; }
+
+/* Barra de desplazamiento */
+.admin-shell[data-theme="light"] ::-webkit-scrollbar-track { background: var(--light-bg); }

@@ -24,11 +24,12 @@ import { CookView } from "./CookView";
 import { 
   Check, X, Printer, Settings, LogOut, Loader2, ClipboardList, MessageSquare, 
   MapPin, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, 
-  Download, Plus, Trash2, Edit2, Menu, Lock, FileText, Search, Store,
+  Download, Plus, Trash2, Edit2, Menu, Lock, FileText, Search, Store, Sun, Moon,
   TrendingUp, Tag, Table, ChefHat, Info, Calendar, Image
 } from "lucide-react";
 
 import { usePermissions } from "../hooks/usePermissions";
+import { useTheme } from "../hooks/useTheme";
 import { PERMISSIONS, ROLES_PERMISSIONS } from "../utils/permissionsConfig";
 import { HasPermission } from "../components/HasPermission";
 
@@ -36,6 +37,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const { hasPermission } = usePermissions(role, permissions);
   const [activeTab, setActiveTab] = useState("pedidos");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -2041,39 +2043,63 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   }, [tabsList, activeTab]);
 
   return (
-    <div className="min-h-screen bg-pizza-dark text-white flex flex-col md:flex-row print:bg-white print:text-black">
+    <div data-theme={theme} className="admin-shell min-h-screen bg-pizza-dark text-white flex flex-col print:bg-white print:text-black">
       
-      {/* Mobile Top Header */}
-      <header className="md:hidden bg-pizza-dark/95 border-b border-white/5 p-4 flex justify-between items-center z-40 shrink-0 sticky top-0">
-        <div className="flex items-center gap-2">
+      {/* Top Header con menú hamburguesa */}
+      <header className="bg-pizza-dark/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 md:px-6 flex justify-between items-center z-40 shrink-0 sticky top-0 print:hidden">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Abrir menú"
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+          >
+            <Menu size={20} />
+          </button>
           {businessConfig.logoUrl ? (
             <img 
               src={businessConfig.logoUrl} 
               alt="Logo" 
-              className="w-6 h-6 rounded-full object-cover border border-white/10" 
+              className="w-7 h-7 rounded-full object-cover border border-white/10" 
               onError={(e) => { e.target.style.display = 'none'; }} 
             />
           ) : (
             <span className="text-2xl">🌶️</span>
           )}
-          <span className="font-pizza-title font-bold text-sm">
-            {businessConfig.name || "Sabor Boliviano"} ({role === "admin" ? "ADM" : role === "cashier" ? "CAJ" : "COC"})
+          <span className="font-pizza-title font-bold text-sm truncate">
+            {businessConfig.name || "Sabor Boliviano"}
+          </span>
+          <span className={`hidden sm:inline text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
+            role === "admin" 
+              ? "bg-pizza-red/20 text-pizza-red border border-pizza-red/35" 
+              : role === "cashier"
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/35"
+                : "bg-amber-500/20 text-amber-400 border border-amber-500/35"
+          }`}>
+            {role === "admin" ? "Admin" : role === "cashier" ? "Cajero" : "Cocinero"}
+          </span>
+          <span className="hidden lg:inline text-xs text-white/40 truncate">
+            · {tabsList.find(t => t.id === activeTab)?.label}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <SoundNotification pendingCount={pendingOrders.length} isMuted={isMuted} setIsMuted={setIsMuted} />
-          <button onClick={() => setMobileMenuOpen(true)} className="p-1 rounded-xl bg-white/5">
-            <Menu size={20} />
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+          >
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
       </header>
 
-      {/* Responsive Left Sidebar Overlay for Mobile */}
+      {/* Menú lateral desplegable (hamburguesa) */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
+        <div className="fixed inset-0 z-50 flex print:hidden">
           <div className="fixed inset-0 bg-black/75" onClick={() => setMobileMenuOpen(false)} />
-          <aside className="relative w-72 bg-pizza-dark flex flex-col justify-between p-6 border-r border-white/10 z-10">
-            <div className="space-y-6 overflow-y-auto pr-1 max-h-[85vh]">
+          <aside className="relative w-72 max-w-[85vw] h-full bg-pizza-dark flex flex-col justify-between p-6 border-r border-white/10 z-10 shadow-2xl">
+            <div className="space-y-6 overflow-y-auto pr-1 flex-1">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   {businessConfig.logoUrl ? (
@@ -2090,12 +2116,13 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                     <h2 className="font-pizza-title font-bold leading-none text-base">
                       {businessConfig.name || "Sabor Boliviano"}
                     </h2>
-                    <span className="text-[10px] text-white/50">
+                    <span className="text-[10px] text-white/50 block mt-1">
                       {role === "admin" ? "Panel Administrador" : role === "cashier" ? "Panel Cajero" : "Panel Cocina"}
                     </span>
+                    <span className="text-[10px] text-white/40 block">{user.email}</span>
                   </div>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-white/60 hover:text-white">
+                <button onClick={() => setMobileMenuOpen(false)} aria-label="Cerrar menú" className="p-1 text-white/60 hover:text-white cursor-pointer">
                   <X size={18} />
                 </button>
               </div>
@@ -2124,82 +2151,28 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
               </nav>
             </div>
 
-            <button
-              onClick={handleLogoutClick}
-              className="flex items-center justify-center gap-2 bg-pizza-red/10 border border-pizza-red/20 text-pizza-red font-bold text-xs py-3 rounded-xl hover:bg-pizza-red/25 cursor-pointer mt-4"
-            >
-              <LogOut size={14} />
-              Cerrar Sesión
-            </button>
+            <div className="pt-4 mt-4 border-t border-white/5 space-y-2">
+              <button
+                onClick={toggleTheme}
+                className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 font-bold text-xs py-3 rounded-xl hover:bg-white/10 cursor-pointer"
+              >
+                {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+                {theme === "dark" ? "Modo Claro" : "Modo Oscuro"}
+              </button>
+              <button
+                onClick={handleLogoutClick}
+                className="w-full flex items-center justify-center gap-2 bg-pizza-red/10 border border-pizza-red/20 text-pizza-red font-bold text-xs py-3 rounded-xl hover:bg-pizza-red/25 cursor-pointer"
+              >
+                <LogOut size={14} />
+                Cerrar Sesión
+              </button>
+            </div>
           </aside>
         </div>
       )}
 
-      {/* Desktop Left Sidebar */}
-      <aside className="hidden md:flex w-64 bg-pizza-dark border-r border-white/5 flex-col justify-between p-6 z-30 shrink-0 sticky top-0 h-screen">
-        <div className="flex flex-col flex-1 overflow-y-auto pr-1">
-          <div className="flex items-center gap-2.5 mb-8">
-            {businessConfig.logoUrl ? (
-              <img 
-                src={businessConfig.logoUrl} 
-                alt="Logo" 
-                className="w-8 h-8 rounded-full object-cover border border-white/10" 
-                onError={(e) => { e.target.style.display = 'none'; }} 
-              />
-            ) : (
-              <span className="text-3xl">🌶️</span>
-            )}
-            <div>
-              <h2 className="font-pizza-title text-base font-bold flex items-center gap-1.5 leading-none">
-                {businessConfig.name || "Sabor Boliviano"}
-                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                  role === "admin" 
-                    ? "bg-pizza-red/20 text-pizza-red border border-pizza-red/35" 
-                    : role === "cashier"
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/35"
-                      : "bg-amber-500/20 text-amber-400 border border-amber-500/35"
-                }`}>
-                  {role === "admin" ? "Admin" : role === "cashier" ? "Cajero" : "Cocinero"}
-                </span>
-              </h2>
-              <span className="text-[10px] text-white/40 block mt-1">{user.email}</span>
-            </div>
-          </div>
-
-          <nav className="space-y-1 flex-1">
-            {tabsList.map((t) => {
-              const Icon = t.icon;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all cursor-pointer ${
-                    activeTab === t.id
-                      ? "bg-pizza-red text-white shadow-lg shadow-pizza-red/15 font-bold"
-                      : "text-white/60 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  <Icon size={16} />
-                  {t.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="pt-4 border-t border-white/5">
-          <button
-            onClick={handleLogoutClick}
-            className="w-full flex items-center justify-center gap-2 bg-pizza-red/10 border border-pizza-red/20 text-pizza-red font-bold text-xs py-3 rounded-xl hover:bg-pizza-red/25 cursor-pointer"
-          >
-            <LogOut size={14} />
-            Cerrar Sesión
-          </button>
-        </div>
-      </aside>
-
       {/* Main Right Pane Content */}
-      <main className="flex-1 overflow-y-auto min-h-screen bg-[#161616] p-4 md:p-8 print:p-0">
+      <main className="flex-1 overflow-y-auto bg-[#161616] p-4 md:p-8 print:p-0">
         
         {/* If POS or Kitchen screen is embedded, let it render directly occupying the space */}
         {activeTab === "pos" ? (
