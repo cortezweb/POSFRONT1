@@ -1,6 +1,9 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { formatCurrency } from "../utils/formatters";
+import { payMethodLabel } from "../utils/payments";
+
+const RECEIPT_TITLES = { nota: "NOTA DE VENTA", boleta: "BOLETA", factura: "FACTURA" };
 
 /**
  * Componente de Ticket para Impresión en diferentes tamaños.
@@ -44,7 +47,7 @@ export const TicketTemplate = ({ order, totals, config, printSize = "80mm" }) =>
         {/* Número de Orden Destacado */}
         <div className="ticket-badge-container">
           <div className="ticket-badge">
-            <h2>ORDEN #{order.orderNumber}</h2>
+            <h2>{order.receiptType ? `${RECEIPT_TITLES[order.receiptType] || "VENTA"} ${order.orderNumber}` : `ORDEN #${order.orderNumber}`}</h2>
           </div>
         </div>
 
@@ -65,10 +68,18 @@ export const TicketTemplate = ({ order, totals, config, printSize = "80mm" }) =>
             <span className="info-label">Cliente:</span>
             <span className="info-val">{order.customerName}</span>
           </div>
-          <div className="info-row">
-            <span className="info-label">Teléfono:</span>
-            <span className="info-val">{order.customerPhone}</span>
-          </div>
+          {order.customerDoc && (
+            <div className="info-row">
+              <span className="info-label">CI/NIT:</span>
+              <span className="info-val">{order.customerDoc}</span>
+            </div>
+          )}
+          {order.customerPhone && (
+            <div className="info-row">
+              <span className="info-label">Teléfono:</span>
+              <span className="info-val">{order.customerPhone}</span>
+            </div>
+          )}
           <div className="info-row">
             <span className="info-label">Servicio:</span>
             <span className="info-val font-bold">
@@ -90,11 +101,7 @@ export const TicketTemplate = ({ order, totals, config, printSize = "80mm" }) =>
           <div className="info-row">
             <span className="info-label">Método Pago:</span>
             <span className="info-val">
-              {order.paymentMethod === "cash"
-                ? "💵 Efectivo"
-                : order.paymentMethod === "yape"
-                ? "📱 Yape/Plin"
-                : "💳 Transferencia"}
+              {payMethodLabel(order.paymentMethod) || "Pendiente"}
             </span>
           </div>
         </div>

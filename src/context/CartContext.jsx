@@ -132,6 +132,20 @@ export const CartProvider = ({ children }) => {
     );
   };
 
+  // Nota para cocina de un producto ya agregado (opcional)
+  const updateItemNote = (cartId, note) => {
+    const clean = (note || "").trim();
+    setCart((prevCart) =>
+      prevCart.map((item) => {
+        if (item.cartId !== cartId) return item;
+        const next = { ...item };
+        if (clean) next.note = clean;
+        else delete next.note;
+        return next;
+      })
+    );
+  };
+
   const clearCart = () => {
     setCart([]);
     setCouponCode("");
@@ -227,6 +241,7 @@ export const CartProvider = ({ children }) => {
         addToCart,
         removeFromCart,
         updateQuantity,
+        updateItemNote,
         clearCart,
         applyCoupon,
         removeCoupon,

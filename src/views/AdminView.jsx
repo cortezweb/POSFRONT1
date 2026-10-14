@@ -984,7 +984,13 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     let cash = 0;
     let electronic = 0;
     shiftOrders.forEach((o) => {
-      if (o.paymentMethod === "cash") {
+      // Ventas con varios métodos de pago: se reparte según lo cobrado en cada uno
+      if (Array.isArray(o.payments) && o.payments.length > 0) {
+        o.payments.forEach((p) => {
+          if (p.method === "cash") cash += Number(p.amount) || 0;
+          else electronic += Number(p.amount) || 0;
+        });
+      } else if (o.paymentMethod === "cash") {
         cash += o.total || 0;
       } else {
         electronic += o.total || 0;

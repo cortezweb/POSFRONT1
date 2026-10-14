@@ -73,6 +73,16 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isStaffOf(rid);
       }
+      // Clientes para comprobantes, correlativos por serie y ventas registradas
+      match /customers/{id} {
+        allow read, write: if isStaffOf(rid);
+      }
+      match /counters/{id} {
+        allow read, write: if isStaffOf(rid);
+      }
+      match /sales/{id} {
+        allow read, create, update: if isStaffOf(rid);
+      }
       match /events/{id} {
         allow read: if true;
         allow write: if isStaffOf(rid);
