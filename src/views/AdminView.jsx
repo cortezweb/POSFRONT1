@@ -30,7 +30,7 @@ import { useCart } from "../context/CartContext";
 import { PLANS, getRestaurantStatus, toDate } from "../utils/restaurantStatus";
 import { PERMISSIONS } from "../utils/permissionsConfig";
 import { PedidosTab } from "./admin/PedidosTab";
-import { VentasTab } from "./admin/VentasTab";
+import { ReportesTab } from "./admin/ReportesTab";
 import { FinanzasTab } from "./admin/FinanzasTab";
 import { InventarioTab } from "./admin/InventarioTab";
 import { CategoriasTab } from "./admin/CategoriasTab";
@@ -126,9 +126,6 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [filterStatus, setFilterStatus] = useState("pending_approval"); // 'pending_approval' | 'preparing' | 'ready' | 'archived'
 
-  // Hover states for custom SVG graphs
-  const [hoveredHourPoint, setHoveredHourPoint] = useState(null);
-  const [hoveredProductIndex, setHoveredProductIndex] = useState(null);
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadLogoError, setUploadLogoError] = useState("");
@@ -1304,64 +1301,8 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     }
   };
 
-  // Ventas Report Metrics & CSS Visual Charts
+  // Pedidos completados (Finanzas)
   const completedOrders = orders.filter(o => o.status === "completed");
-  const totalSalesRevenue = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-  const averageTicket = completedOrders.length > 0 ? totalSalesRevenue / completedOrders.length : 0;
-
-  // Ventas por hora
-  const salesByHour = useMemo(() => {
-    const hours = Array.from({ length: 24 }, (_, i) => ({ hour: i, total: 0, count: 0 }));
-    completedOrders.forEach(o => {
-      if (o.createdAt) {
-        const date = o.createdAt.seconds ? new Date(o.createdAt.seconds * 1000) : new Date(o.createdAt);
-        if (!isNaN(date.getTime())) {
-          const hour = date.getHours();
-          hours[hour].total += o.total || 0;
-          hours[hour].count += 1;
-        }
-      }
-    });
-    return hours;
-  }, [completedOrders]);
-
-  // Top 5 Productos
-  const topProducts = useMemo(() => {
-    const productCounts = {};
-    completedOrders.forEach(o => {
-      if (o.items && Array.isArray(o.items)) {
-        o.items.forEach(item => {
-          const name = item.name || "Producto";
-          const qty = Number(item.quantity) || 0;
-          const revenue = (Number(item.price) || 0) * qty;
-          if (!productCounts[name]) {
-            productCounts[name] = { name, quantity: 0, revenue: 0 };
-          }
-          productCounts[name].quantity += qty;
-          productCounts[name].revenue += revenue;
-        });
-      }
-    });
-    return Object.values(productCounts)
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 5);
-  }, [completedOrders]);
-
-  // Distribución de Canales de Ventas
-  const modeCounts = { dinein: 0, pickup: 0, delivery: 0 };
-  completedOrders.forEach(o => {
-    if (modeCounts[o.serviceMode] !== undefined) {
-      modeCounts[o.serviceMode] += o.total || 0;
-    }
-  });
-
-  // Distribución de Métodos de Pago
-  const payCounts = { cash: 0, yape: 0, transfer: 0 };
-  completedOrders.forEach(o => {
-    if (payCounts[o.paymentMethod] !== undefined) {
-      payCounts[o.paymentMethod] += o.total || 0;
-    }
-  });
 
   // Clientes CRM Agrupado
   const customerMap = {};
@@ -1759,21 +1700,6 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     document.body.removeChild(link);
   };
 
-  const handleExportSalesCSV = () => {
-    const headers = ["Numero_Orden", "Fecha", "Cliente", "Telefono", "Metodo_Pago", "Servicio", "Total", "Estado"];
-    const rows = completedOrders.map(o => [
-      o.orderNumber,
-      o.createdAt ? new Date(o.createdAt.seconds * 1000).toLocaleString() : "",
-      o.customerName,
-      o.customerPhone,
-      o.paymentMethod,
-      o.serviceMode,
-      o.total,
-      o.status
-    ]);
-    downloadCSV("reporte_ventas.csv", headers, rows);
-    logAuditEvent(user.email, "EXPORTAR_CSV_VENTAS", "Exportó reporte de ventas a CSV");
-  };
 
   const handleExportInventoryCSV = () => {
     const headers = ["ID", "Nombre", "Categoria", "Precio", "Descuento", "Descripcion"];
@@ -2055,7 +1981,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     { id: "cocina", label: "Cocina KDS", icon: ChefHat, permission: PERMISSIONS.ACCESO_COCINA },
     { id: "pos", label: "POS Caja", icon: Store, permission: PERMISSIONS.ACCESO_POS },
     { id: "recibos", label: "Recibos Emitidos", icon: ReceiptText, permission: PERMISSIONS.VER_RECIBOS },
-    { id: "ventas", label: "Reporte Ventas", icon: BarChart3, permission: PERMISSIONS.VER_VENTAS },
+    { id: "ventas", label: "Reportes", icon: BarChart3, permission: PERMISSIONS.VER_VENTAS },
     { id: "finanzas", label: "Resultados Financieros", icon: TrendingUp, permission: PERMISSIONS.VER_FINANZAS },
     { id: "compras", label: "Compras e Insumos", icon: ShoppingCart, permission: PERMISSIONS.VER_COMPRAS },
     { id: "inventario", label: "Inventario CRUD", icon: Package, permission: PERMISSIONS.VER_INVENTARIO },
@@ -2476,20 +2402,11 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
             {/* TAB CONTENT: VENTAS REPORT */}
             {activeTab === "ventas" && hasPermission(PERMISSIONS.VER_VENTAS) && (
-              <VentasTab
-                averageTicket={averageTicket}
+              <ReportesTab
+                orders={orders}
+                productsList={productsList}
+                categoriesListToUse={categoriesListToUse}
                 businessConfig={businessConfig}
-                completedOrders={completedOrders}
-                handleExportSalesCSV={handleExportSalesCSV}
-                hoveredHourPoint={hoveredHourPoint}
-                hoveredProductIndex={hoveredProductIndex}
-                modeCounts={modeCounts}
-                payCounts={payCounts}
-                salesByHour={salesByHour}
-                setHoveredHourPoint={setHoveredHourPoint}
-                setHoveredProductIndex={setHoveredProductIndex}
-                topProducts={topProducts}
-                totalSalesRevenue={totalSalesRevenue}
               />
             )}
 
