@@ -51,6 +51,29 @@ export const ConfiguracionTab = ({
         </div>
       </div>
 
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Documento</label>
+          <select
+            value={settingsForm.taxIdLabel || "NIT"}
+            onChange={(e) => setSettingsForm(prev => ({ ...prev, taxIdLabel: e.target.value }))}
+            className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+          >
+            {["NIT", "RUC", "RFC", "CUIT", "RUT"].map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Número</label>
+          <input
+            type="text"
+            value={settingsForm.taxId || ""}
+            onChange={(e) => setSettingsForm(prev => ({ ...prev, taxId: e.target.value }))}
+            placeholder="Ej. 1234567019"
+            className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/20 focus:outline-none"
+          />
+        </div>
+      </div>
+
       <div>
         <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Logo del Negocio</label>
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">

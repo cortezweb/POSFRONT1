@@ -22,10 +22,12 @@ import { SoundNotification } from "../components/SoundNotification";
 import { TicketTemplate } from "../components/TicketTemplate";
 import { POSView } from "./POSView";
 import { CookView } from "./CookView";
-import { X, Settings, LogOut, Loader2, ClipboardList, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, Plus, Trash2, Menu, Lock, FileText, Search, Store, Sun, Moon, ChevronsLeft, TrendingUp, Tag, Table, ChefHat, Calendar } from "lucide-react";
+import { PanelLeft, LayoutGrid, Wallet, Clock, ChevronDown, CheckCircle2, X, Settings, LogOut, Loader2, ClipboardList, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, Plus, Trash2, Menu, Lock, FileText, Search, Store, Sun, Moon, ChevronsLeft, TrendingUp, Tag, Table, ChefHat, Calendar } from "lucide-react";
 
 import { usePermissions } from "../hooks/usePermissions";
 import { useTheme } from "../hooks/useTheme";
+import { useCart } from "../context/CartContext";
+import { PLANS, getRestaurantStatus, toDate } from "../utils/restaurantStatus";
 import { PERMISSIONS } from "../utils/permissionsConfig";
 import { PedidosTab } from "./admin/PedidosTab";
 import { VentasTab } from "./admin/VentasTab";
@@ -50,6 +52,27 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const [activeTab, setActiveTab] = useState("pedidos");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { setServiceMode: setCartServiceMode, setTableNumber: setCartTableNumber } = useCart();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [restaurantInfo, setRestaurantInfo] = useState(null);
+  const [zonesList, setZonesList] = useState([]);
+  const [nowMs] = useState(() => Date.now());
+
+  // Ficha del restaurante (plan y vencimiento) para la barra superior
+  useEffect(() => {
+    return onSnapshot(doc(db, "restaurants", getRestaurantId()), (snap) => {
+      setRestaurantInfo(snap.exists() ? snap.data() : null);
+    }, () => setRestaurantInfo(null));
+  }, []);
+
+  // Lugares del local (Salón, Terraza...)
+  useEffect(() => {
+    return onSnapshot(rCol("zones"), (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
+      setZonesList(list);
+    }, (err) => console.error("Error al cargar lugares:", err));
+  }, []);
   const [legacyDataPending, setLegacyDataPending] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [migrationLog, setMigrationLog] = useState([]);
@@ -172,9 +195,6 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const [productsList, setProductsList] = useState([]);
   // Mesas
   const [tablesList, setTablesList] = useState([]);
-  const [tableNameForm, setTableNameForm] = useState("");
-  const [tableCapacityForm, setTableCapacityForm] = useState("4");
-  const [editingTable, setEditingTable] = useState(null);
   // Lista de usuarios registrada en Firestore (Personal)
   const [usersList, setUsersList] = useState([]);
   // Auditoría
@@ -955,7 +975,10 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     // Filtrar órdenes completadas o aprobadas después de abrir caja
     const shiftOrders = orders.filter((o) => {
       const oTime = o.createdAt?.seconds || 0;
-      return oTime >= openTimeSeconds && (o.status === "completed" || o.status === "preparing" || o.status === "ready");
+      // Lo que sigue sin cobrar (cuentas abiertas en mesa) todavía no entra a la caja
+      if (o.paymentStatus === "pending") return false;
+      const paidTime = o.paidAt?.seconds || oTime;
+      return paidTime >= openTimeSeconds && (o.status === "completed" || o.status === "preparing" || o.status === "ready");
     });
 
     let cash = 0;
@@ -1844,54 +1867,6 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     }
   };
 
-  const handleSaveTable = async (e) => {
-    e.preventDefault();
-    if (!tableNameForm.trim()) {
-      alert("El nombre de la mesa es requerido.");
-      return;
-    }
-    const tId = editingTable ? editingTable.id : tableNameForm.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || Date.now().toString();
-    try {
-      await setDoc(rDoc("tables", tId), {
-        id: tId,
-        name: tableNameForm.trim(),
-        capacity: parseInt(tableCapacityForm, 10) || 4,
-        status: editingTable ? editingTable.status : "libre"
-      });
-      setTableNameForm("");
-      setTableCapacityForm("4");
-      setEditingTable(null);
-      await logAuditEvent(user.email, editingTable ? "EDITAR_MESA" : "CREAR_MESA", `Mesa: ${tableNameForm.trim()} (ID: ${tId})`);
-      alert("Mesa guardada exitosamente.");
-    } catch (err) {
-      console.error("Error al guardar mesa:", err);
-      alert("Error al guardar mesa.");
-    }
-  };
-
-  const handleToggleTableStatus = async (table) => {
-    try {
-      const nextStatus = table.status === "ocupada" ? "libre" : "ocupada";
-      await updateDoc(rDoc("tables", table.id), { status: nextStatus });
-      await logAuditEvent(user.email, "CAMBIAR_ESTADO_MESA", `Mesa ${table.name} cambiada a ${nextStatus}`);
-    } catch (err) {
-      console.error("Error al cambiar estado de mesa:", err);
-      alert("Error al cambiar el estado.");
-    }
-  };
-
-  const handleDeleteTable = async (tId, name) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar la mesa "${name}"?`)) return;
-    try {
-      await deleteDoc(rDoc("tables", tId));
-      await logAuditEvent(user.email, "ELIMINAR_MESA", `Mesa eliminada: ${name} (ID: ${tId})`);
-      alert("Mesa eliminada.");
-    } catch (err) {
-      console.error("Error al eliminar mesa:", err);
-      alert("Error al eliminar mesa.");
-    }
-  };
-
   // Funciones para Gestión de Eventos y Pre-registros
   const handleSaveEvent = async (e) => {
     e.preventDefault();
@@ -2088,6 +2063,30 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     { id: "eventos", label: "Eventos & Marketing", icon: Calendar, permission: PERMISSIONS.CONFIGURAR_TIENDA }
   ].filter(tab => hasPermission(tab.permission));
 
+  // Cuentas abiertas por mesa (pedidos en mesa sin cobrar)
+  const openByTable = orders
+    .filter((o) => o.serviceMode === "dinein" && o.paymentStatus === "pending" && o.status !== "rejected" && o.status !== "cancelled")
+    .reduce((acc, o) => {
+      const key = o.tableNumber;
+      if (!acc[key]) acc[key] = { orders: [], total: 0, openedAt: Infinity };
+      acc[key].orders.push(o);
+      acc[key].total += Number(o.total || 0);
+      acc[key].openedAt = Math.min(acc[key].openedAt, o.createdAt?.seconds || Infinity);
+      return acc;
+    }, {});
+
+  const handleTakeTableOrder = (table) => {
+    setCartServiceMode("dinein");
+    setCartTableNumber(table.name);
+    setActiveTab("pos");
+  };
+
+  const planStatus = getRestaurantStatus(restaurantInfo, nowMs);
+  const planDateValue = toDate(restaurantInfo?.nextPaymentAt) || toDate(restaurantInfo?.trialEndsAt);
+  const planDate = planDateValue ? planDateValue.toLocaleDateString("es-BO", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const shiftOpenDate = toDate(activeShift?.openTime);
+  const shiftOpenLabel = shiftOpenDate ? shiftOpenDate.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" }) : "";
+
   // Redirigir a la primera pestaña permitida si la seleccionada actualmente no está autorizada
   useEffect(() => {
     if (tabsList.length > 0 && !tabsList.find(t => t.id === activeTab)) {
@@ -2190,52 +2189,114 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
       <div className="flex-1 min-w-0 flex flex-col">
       
-      {/* Top Header con menú hamburguesa */}
-      <header className="bg-pizza-dark/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 md:px-6 flex justify-between items-center z-40 shrink-0 sticky top-0 print:hidden">
+      {/* Barra superior: negocio, plan, accesos rápidos, caja y usuario */}
+      <header className="bg-pizza-dark/95 backdrop-blur-xl border-b border-white/5 px-3 md:px-5 py-2.5 flex items-center justify-between gap-3 z-40 shrink-0 sticky top-0 print:hidden">
         <div className="flex items-center gap-3 min-w-0">
           <button
-            onClick={() => setMobileMenuOpen(true)}
-            aria-label="Abrir menú"
-            className="md:hidden p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+            onClick={() => (window.matchMedia("(min-width: 768px)").matches ? toggleRail() : setMobileMenuOpen(true))}
+            aria-label="Mostrar u ocultar menú"
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer shrink-0"
           >
-            <Menu size={20} />
+            <PanelLeft size={18} />
           </button>
-          {businessConfig.logoUrl ? (
-            <img 
-              src={businessConfig.logoUrl} 
-              alt="Logo" 
-              className="md:hidden w-7 h-7 rounded-full object-cover border border-white/10" 
-              onError={(e) => { e.target.style.display = 'none'; }} 
-            />
-          ) : (
-            <span className="md:hidden text-2xl">🌶️</span>
+          <div className="min-w-0">
+            <div className="font-pizza-title font-extrabold text-sm uppercase truncate leading-tight">
+              {businessConfig.name || "GloryChef"}
+            </div>
+            <div className="text-[10px] text-white/40 font-mono truncate">
+              {businessConfig.taxId ? `${businessConfig.taxIdLabel || "NIT"} ${businessConfig.taxId}` : tabsList.find(t => t.id === activeTab)?.label}
+            </div>
+          </div>
+          {restaurantInfo && (
+            <div className={`hidden lg:flex items-center gap-3 rounded-xl border px-3 py-1 shrink-0 ${planStatus.ok ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"}`}>
+              <div className="leading-tight">
+                <div className="text-[10px] font-black uppercase tracking-wider">{PLANS[restaurantInfo.plan]?.label || restaurantInfo.plan || "Plan"}</div>
+                <div className={`text-[10px] font-bold flex items-center gap-1 ${planStatus.ok ? "text-emerald-400" : "text-red-400"}`}>
+                  <CheckCircle2 size={10} /> {planStatus.label === "Activo" ? "Al día" : planStatus.label}
+                </div>
+              </div>
+              {planDate && (
+                <div className="leading-tight border-l border-white/10 pl-3">
+                  <div className="text-[9px] text-white/40">{restaurantInfo.plan === "trial" ? "Vence" : "Próximo"}</div>
+                  <div className="text-[11px] font-bold">{planDate}</div>
+                </div>
+              )}
+            </div>
           )}
-          <span className="font-pizza-title font-bold text-sm truncate">
-            {businessConfig.name || "GloryChef"}
-          </span>
-          <span className={`hidden sm:inline text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
-            role === "admin" 
-              ? "bg-pizza-red/20 text-pizza-red border border-pizza-red/35" 
-              : role === "cashier"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/35"
-                : "bg-amber-500/20 text-amber-400 border border-amber-500/35"
-          }`}>
-            {role === "admin" ? "Admin" : role === "cashier" ? "Cajero" : "Cocinero"}
-          </span>
-          <span className="hidden lg:inline text-xs text-white/40 truncate">
-            · {tabsList.find(t => t.id === activeTab)?.label}
-          </span>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Accesos rápidos */}
+        <nav className="hidden md:flex items-center gap-1">
+          {[["pos", "POS", Store], ["mesas", "Mesas", LayoutGrid], ["cocina", "Comandas", ChefHat]]
+            .filter(([id]) => tabsList.some((t) => t.id === id))
+            .map(([id, label, Icon]) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === id ? "bg-pizza-red/10 text-pizza-red" : "text-white/70 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <Icon size={16} /> {label}
+              </button>
+            ))}
+        </nav>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {tabsList.some((t) => t.id === "caja") && (
+            <button
+              onClick={() => setActiveTab("caja")}
+              className={`hidden sm:flex items-center rounded-xl border overflow-hidden cursor-pointer transition-all ${activeShift ? "border-emerald-500/30 hover:border-emerald-500/60" : "border-amber-500/30 hover:border-amber-500/60"}`}
+              title="Ir a Arqueo de Caja"
+            >
+              <div className="px-3 py-1 leading-tight text-left">
+                <div className="text-[9px] font-black uppercase tracking-wider text-white/50 flex items-center gap-1"><Wallet size={10} /> Mi caja</div>
+                <div className={`text-xs font-black ${activeShift ? "text-emerald-400" : "text-amber-400"}`}>
+                  {activeShift ? formatCurrency((activeShift.cashBase || 0) + getShiftExpectedTotals().cash, businessConfig.currency) : "Cerrada"}
+                </div>
+              </div>
+              <div className="px-3 py-1 leading-tight text-left border-l border-white/10 hidden lg:block">
+                <div className="text-[9px] font-black uppercase tracking-wider text-white/50 flex items-center gap-1"><Clock size={10} /> Apertura</div>
+                <div className="text-xs font-bold">{activeShift ? shiftOpenLabel : "Abrir caja"}</div>
+              </div>
+            </button>
+          )}
           <SoundNotification pendingCount={pendingOrders.length} isMuted={isMuted} setIsMuted={setIsMuted} />
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
-          >
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-xl border border-white/10 hover:bg-white/5 pl-1 pr-2 py-1 cursor-pointer"
+              aria-haspopup="menu"
+              aria-expanded={userMenuOpen}
+            >
+              <span className="w-8 h-8 rounded-lg bg-pizza-red text-white font-black text-sm flex items-center justify-center uppercase">
+                {(user.email || "?")[0]}
+              </span>
+              <span className="hidden md:block text-left leading-tight max-w-[140px]">
+                <span className="block text-xs font-bold truncate">{user.displayName || user.email?.split("@")[0]}</span>
+                <span className="block text-[10px] text-white/50">{role === "admin" ? "Administrador" : role === "cashier" ? "Cajero" : "Cocinero"}</span>
+              </span>
+              <ChevronDown size={14} className="text-white/50 hidden md:block" />
+            </button>
+            {userMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                <div role="menu" className="absolute right-0 mt-2 w-56 z-50 bg-[#181818] border border-white/10 rounded-2xl shadow-2xl p-2">
+                  <div className="px-3 py-2 border-b border-white/5 mb-1">
+                    <div className="text-xs font-bold truncate">{user.email}</div>
+                    <div className="text-[10px] text-white/50">{role === "admin" ? "Administrador" : role === "cashier" ? "Cajero" : "Cocinero"}</div>
+                  </div>
+                  <button role="menuitem" onClick={() => { toggleTheme(); setUserMenuOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs hover:bg-white/5 cursor-pointer">
+                    {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />} {theme === "dark" ? "Modo claro" : "Modo oscuro"}
+                  </button>
+                  <button role="menuitem" onClick={handleLogoutClick} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-pizza-red hover:bg-pizza-red/10 cursor-pointer">
+                    <LogOut size={14} /> Cerrar sesión
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -2361,7 +2422,6 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
               <div className="flex items-center gap-3">
                 {activeTab === "pedidos" && (
                   <>
-                    <SoundNotification pendingCount={pendingOrders.length} isMuted={isMuted} setIsMuted={setIsMuted} />
                     <div className="flex items-center gap-1.5 bg-[#181818] border border-white/10 rounded-full px-3 py-1.5 text-xs">
                       <Settings size={14} className="text-[#ffd79b]" />
                       <span className="text-white/60">Ticket:</span>
@@ -2470,16 +2530,13 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
             {/* TAB CONTENT: GESTION DE MESAS */}
             {activeTab === "mesas" && hasPermission(PERMISSIONS.VER_MESAS) && (
               <MesasTab
-                editingTable={editingTable}
-                handleDeleteTable={handleDeleteTable}
-                handleSaveTable={handleSaveTable}
-                handleToggleTableStatus={handleToggleTableStatus}
-                setEditingTable={setEditingTable}
-                setTableCapacityForm={setTableCapacityForm}
-                setTableNameForm={setTableNameForm}
-                tableCapacityForm={tableCapacityForm}
-                tableNameForm={tableNameForm}
                 tablesList={tablesList}
+                zonesList={zonesList}
+                openByTable={openByTable}
+                currency={businessConfig.currency}
+                user={user}
+                logAuditEvent={logAuditEvent}
+                onTakeOrder={handleTakeTableOrder}
               />
             )}
 

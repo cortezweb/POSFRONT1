@@ -69,6 +69,10 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isStaffOf(rid);
       }
+      match /zones/{id} {
+        allow read: if true;
+        allow write: if isStaffOf(rid);
+      }
       match /events/{id} {
         allow read: if true;
         allow write: if isStaffOf(rid);

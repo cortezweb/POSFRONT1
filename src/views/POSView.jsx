@@ -35,6 +35,13 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const [activeMobileTab, setActiveMobileTab] = useState("menu");
   const [posSearch, setPosSearch] = useState("");
   const [tablesList, setTablesList] = useState([]);
+  const [zonesList, setZonesList] = useState([]);
+
+  useEffect(() => {
+    return onSnapshot(rCol("zones"), (snap) => {
+      setZonesList(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+    }, () => {});
+  }, []);
   const [itemNote, setItemNote] = useState("");
   const [orderNote, setOrderNote] = useState("");
   const [lastSentOrder, setLastSentOrder] = useState(null);
@@ -899,11 +906,16 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                   className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white"
                 >
                   <option value="">Selecciona Mesa</option>
-                  {tablesList.map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name} ({t.status === "ocupada" ? "Ocupada" : "Libre"})
-                    </option>
-                  ))}
+                  {[...zonesList, { id: "", name: zonesList.length ? "Sin lugar" : "" }].map((z) => {
+                    const group = tablesList.filter((t) => (z.id ? t.zoneId === z.id : !zonesList.some((zz) => zz.id === t.zoneId)));
+                    if (group.length === 0) return null;
+                    const opts = group.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name} · {t.capacity || "?"} pers. ({t.status === "ocupada" ? "Ocupada" : "Libre"})
+                      </option>
+                    ));
+                    return z.name ? <optgroup key={z.id || "none"} label={z.name}>{opts}</optgroup> : opts;
+                  })}
                 </select>
               )}
 
@@ -1327,11 +1339,16 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                         className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white"
                       >
                         <option value="">Selecciona Mesa</option>
-                        {tablesList.map((t) => (
-                          <option key={t.id} value={t.name}>
-                            {t.name} ({t.status === "ocupada" ? "Ocupada" : "Libre"})
-                          </option>
-                        ))}
+                        {[...zonesList, { id: "", name: zonesList.length ? "Sin lugar" : "" }].map((z) => {
+                          const group = tablesList.filter((t) => (z.id ? t.zoneId === z.id : !zonesList.some((zz) => zz.id === t.zoneId)));
+                          if (group.length === 0) return null;
+                          const opts = group.map((t) => (
+                            <option key={t.id} value={t.name}>
+                              {t.name} · {t.capacity || "?"} pers. ({t.status === "ocupada" ? "Ocupada" : "Libre"})
+                            </option>
+                          ));
+                          return z.name ? <optgroup key={z.id || "none"} label={z.name}>{opts}</optgroup> : opts;
+                        })}
                       </select>
                     )}
 
