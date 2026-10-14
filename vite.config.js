@@ -15,9 +15,9 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 // Aumentar límite a 4MB por librerías pesadas (Mapbox/Firebase)
       },
       manifest: {
-        name: 'Pizza Hub POS & Menu',
-        short_name: 'PizzaHub',
-        description: 'Menú digital y sistema POS de Pizza Hub',
+        name: 'GloryChef POS & Menú',
+        short_name: 'GloryChef',
+        description: 'Menú digital y sistema POS para restaurantes GloryChef',
         theme_color: '#131313',
         background_color: '#131313',
         display: 'standalone',

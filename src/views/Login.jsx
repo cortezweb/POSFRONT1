@@ -68,7 +68,7 @@ export const Login = ({ onLoginSuccess }) => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="empleado@saborboliviano.com"
+                placeholder="empleado@glorychef.com"
                 className="w-full bg-pizza-dark/80 border border-white/10 rounded-xl px-4 py-3 pl-10 text-white placeholder-white/30 focus:outline-none focus:border-pizza-red transition-all text-sm"
               />
               <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />

@@ -410,7 +410,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                 )}
                 <div>
                   <h2 className="font-pizza-title text-xl font-bold">
-                    {businessConfig.name || "Sabor Boliviano"} POS
+                    {businessConfig.name || "GloryChef"} POS
                   </h2>
                   <span className="text-[10px] text-white/50 block">Rol: Cajero ({user.email})</span>
                 </div>
@@ -820,7 +820,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
           <div className="flex items-center gap-1.5">
             <span className="text-xl">🌶️</span>
             <div className="text-left">
-              <h2 className="font-pizza-title text-sm font-bold text-white">{businessConfig.name || "Sabor Boliviano"} POS</h2>
+              <h2 className="font-pizza-title text-sm font-bold text-white">{businessConfig.name || "GloryChef"} POS</h2>
               <span className="text-[9px] text-white/50 block">Rol: Cajero ({user.email})</span>
             </div>
           </div>

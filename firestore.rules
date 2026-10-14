@@ -1,0 +1,97 @@
+rules_version = '2';
+
+// Reglas de seguridad de GloryChef
+// - El público (menú del cliente) solo puede leer el catálogo, crear pedidos
+//   y registrarse en eventos.
+// - El personal (admin, cajero, cocinero) gestiona la operación.
+// - Solo el administrador gestiona usuarios.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isStaff() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userRole() in ['admin', 'cashier', 'cook'];
+    }
+    function isAdmin() {
+      return isStaff() && userRole() == 'admin';
+    }
+
+    // Configuración del negocio: pública para el menú, editable por el personal
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // Catálogo público
+    match /products/{id} {
+      allow read: if true;
+      allow create, delete: if isStaff();
+      // El cliente solo puede descontar stock al hacer un pedido
+      allow update: if isStaff()
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock'])
+            && request.resource.data.stock < resource.data.stock);
+    }
+    match /categories/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /tables/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /events/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // Registro a eventos: el público solo crea
+    match /event_registrations/{id} {
+      allow create: if true;
+      allow read, update, delete: if isStaff();
+    }
+
+    // Pedidos
+    match /orders/{id} {
+      // Seguimiento por enlace (#/track/{id}) y búsqueda por teléfono/número (máx. 5)
+      allow get: if true;
+      allow list: if isStaff() || request.query.limit <= 5;
+      // Pedido del cliente: siempre entra como pendiente de aprobación
+      allow create: if isStaff()
+        || (request.resource.data.status == 'pending_approval'
+            && request.resource.data.createdBy == 'client'
+            && request.resource.data.total is number
+            && request.resource.data.total >= 0);
+      allow update, delete: if isStaff();
+    }
+
+    // Operación interna
+    match /shifts/{id} {
+      allow read, write: if isStaff();
+    }
+    match /expenses/{id} {
+      allow read, write: if isStaff();
+    }
+    match /logs/{id} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+    }
+
+    // Usuarios del personal
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Todo lo demás, cerrado
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

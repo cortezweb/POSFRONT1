@@ -23,7 +23,7 @@ export const CartProvider = ({ children }) => {
   
   // Parámetros del negocio leídos en tiempo real de Firestore
   const [businessConfig, setBusinessConfig] = useState({
-    name: "Sabor Boliviano",
+    name: "GloryChef",
     currency: "BOB",
     whatsappNumber: "+59177777777",
     vCardEnabled: true,

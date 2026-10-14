@@ -109,7 +109,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Configuración del negocio leída para el ticket y administración
   const [businessConfig, setBusinessConfig] = useState({
-    name: "Sabor Boliviano",
+    name: "GloryChef",
     whatsappNumber: "+59177777777",
     address: "Av. Hernando Siles 456, Sucre, Bolivia",
     currency: "BOB",
@@ -2073,7 +2073,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
             {railExpanded && (
               <div className="min-w-0">
                 <h2 className="font-pizza-title font-bold text-sm text-white leading-tight truncate">
-                  {businessConfig.name || "Sabor Boliviano"}
+                  {businessConfig.name || "GloryChef"}
                 </h2>
                 <span className="text-[10px] text-white/80 block truncate">
                   {role === "admin" ? "Panel Administrador" : role === "cashier" ? "Panel Cajero" : "Panel Cocina"}
@@ -2163,7 +2163,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
             <span className="md:hidden text-2xl">🌶️</span>
           )}
           <span className="font-pizza-title font-bold text-sm truncate">
-            {businessConfig.name || "Sabor Boliviano"}
+            {businessConfig.name || "GloryChef"}
           </span>
           <span className={`hidden sm:inline text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
             role === "admin" 
@@ -2211,7 +2211,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                   )}
                   <div>
                     <h2 className="font-pizza-title font-bold leading-none text-base">
-                      {businessConfig.name || "Sabor Boliviano"}
+                      {businessConfig.name || "GloryChef"}
                     </h2>
                     <span className="text-[10px] text-white/50 block mt-1">
                       {role === "admin" ? "Panel Administrador" : role === "cashier" ? "Panel Cajero" : "Panel Cocina"}
@@ -2285,7 +2285,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                 <h1 className="text-2xl font-bold tracking-tight uppercase font-pizza-title">
                   {tabsList.find(t => t.id === activeTab)?.label}
                 </h1>
-                <p className="text-xs text-white/50">Módulo del sistema de administración {businessConfig.name || "Sabor Boliviano"}</p>
+                <p className="text-xs text-white/50">Módulo del sistema de administración {businessConfig.name || "GloryChef"}</p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -5141,7 +5141,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
                       required
                       value={seoForm.metaTitle}
                       onChange={(e) => setSeoForm(prev => ({ ...prev, metaTitle: e.target.value }))}
-                      placeholder={`Ej. '${businessConfig.name || "Sabor Boliviano"} - El verdadero sabor tradicional boliviano'`}
+                      placeholder={`Ej. '${businessConfig.name || "GloryChef"} - El verdadero sabor tradicional boliviano'`}
                       className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
                     />
                   </div>

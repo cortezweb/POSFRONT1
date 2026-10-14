@@ -32,7 +32,7 @@ export const seedDatabase = async () => {
     // 1. Sembrar Configuración del Negocio
     const configRef = doc(db, "config", "settings");
     await setDoc(configRef, {
-      name: "Sabor Boliviano",
+      name: "GloryChef",
       whatsappNumber: "+59177777777",
       address: "Av. Hernando Siles 456, Sucre, Bolivia",
       currency: "BOB",

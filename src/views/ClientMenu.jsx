@@ -530,7 +530,7 @@ export const ClientMenu = () => {
             )}
             <div>
               <h1 className="font-pizza-title text-xl font-bold text-pizza-dark leading-none">
-                {businessConfig.name || "Sabor Boliviano"}
+                {businessConfig.name || "GloryChef"}
               </h1>
               <span className="text-[10px] text-pizza-red font-medium uppercase tracking-wider">
                 Auténtico Sabor
@@ -837,7 +837,7 @@ export const ClientMenu = () => {
 
         {/* Pie de página Desktop */}
         <footer className="py-8 mt-12 border-t border-gray-200 text-center text-xs text-gray-400 space-y-2">
-          <p>© 2026 {businessConfig.name || "Sabor Boliviano"} - Todos los derechos reservados.</p>
+          <p>© 2026 {businessConfig.name || "GloryChef"} - Todos los derechos reservados.</p>
         </footer>
       </div>
 
@@ -1890,7 +1890,7 @@ export const ClientMenu = () => {
               <div className="space-y-4 text-xs">
                 <div>
                   <h4 className="text-[10px] font-bold uppercase tracking-wider text-pizza-red mb-1">Restaurante</h4>
-                  <p className="text-gray-700 font-medium">{businessConfig.name || "Sabor Boliviano"}</p>
+                  <p className="text-gray-700 font-medium">{businessConfig.name || "GloryChef"}</p>
                   <p className="text-gray-500 mt-0.5">{businessConfig.address || "Av. Hernando Siles 456, Sucre, Bolivia"}</p>
                 </div>
                 <div>

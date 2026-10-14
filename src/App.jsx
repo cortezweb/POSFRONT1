@@ -118,7 +118,8 @@ function App() {
       return <Login onLoginSuccess={handleLoginSuccess} />;
     }
 
-    if (currentPath === "#/test-bnb") {
+    // Simulador de pagos: solo en desarrollo o para administradores logueados
+    if (currentPath === "#/test-bnb" && (import.meta.env.DEV || role === "admin")) {
       return <TestBNBView />;
     }
 

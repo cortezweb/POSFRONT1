@@ -113,7 +113,7 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
         elStore.innerHTML = `<div style="background-color: #e23636; border: 2px solid white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 0 10px rgba(226, 54, 54, 0.6); animation: pulse 2s infinite;">🌶️</div>`;
         new mapboxgl.Marker(elStore)
           .setLngLat([businessLocation.lng, businessLocation.lat])
-          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<h3><b>${businessConfig.name || "Sabor Boliviano"}</b></h3><p>Ubicación del Local</p>`))
+          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<h3><b>${businessConfig.name || "GloryChef"}</b></h3><p>Ubicación del Local</p>`))
           .addTo(map);
 
         // Marcador Cliente (Destino)
