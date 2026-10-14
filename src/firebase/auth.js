@@ -1,6 +1,7 @@
 import { auth, db } from "./config";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { setRestaurantId, DEFAULT_RESTAURANT_ID } from "./tenant";
 
 /**
  * Inicia sesión de un usuario de personal y retorna su información junto con su rol.
@@ -20,6 +21,7 @@ export const loginUser = async (email, password) => {
         await signOut(auth);
         throw new Error("Su cuenta de personal ha sido suspendida. Contacte al administrador.");
       }
+      setRestaurantId(userData.restaurantId || DEFAULT_RESTAURANT_ID);
       return { user, role: userData.role, permissions: userData.permissions || null };
     } else {
       throw new Error("El usuario no tiene un rol configurado en la colección 'users'.");

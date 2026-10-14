@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { rCol, rDoc, getRestaurantId } from "../firebase/tenant";
 import { db, firebaseConfig, storage } from "../firebase/config";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { compressImage } from "../utils/imageCompressor";
@@ -11,7 +12,7 @@ const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 import { 
   collection, query, onSnapshot, doc, updateDoc, setDoc, deleteDoc, addDoc,
-  serverTimestamp, orderBy, increment 
+  serverTimestamp, orderBy, increment, where 
 } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
@@ -32,12 +33,46 @@ import { usePermissions } from "../hooks/usePermissions";
 import { useTheme } from "../hooks/useTheme";
 import { PERMISSIONS, ROLES_PERMISSIONS } from "../utils/permissionsConfig";
 import { HasPermission } from "../components/HasPermission";
+import { migrateLegacyData, hasLegacyData } from "../utils/migrateToTenant";
 
 export const AdminView = ({ user, role, permissions, onLogout }) => {
   const { hasPermission } = usePermissions(role, permissions);
   const [activeTab, setActiveTab] = useState("pedidos");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [legacyDataPending, setLegacyDataPending] = useState(false);
+  const [migrating, setMigrating] = useState(false);
+  const [migrationLog, setMigrationLog] = useState([]);
+
+  // Detectar datos del formato anterior (un solo restaurante) para ofrecer migrarlos
+  useEffect(() => {
+    if (role !== "admin") return;
+    let cancelled = false;
+    hasLegacyData().then((pending) => {
+      if (!cancelled) setLegacyDataPending(pending);
+    });
+    return () => { cancelled = true; };
+  }, [role]);
+
+  const handleMigrateLegacy = async () => {
+    if (!window.confirm("Se copiarán tus datos actuales al nuevo formato de varios restaurantes. Los datos originales no se borran. ¿Continuar?")) return;
+    setMigrating(true);
+    setMigrationLog([]);
+    try {
+      await migrateLegacyData({
+        restaurantName: businessConfig.name,
+        onProgress: (msg) => setMigrationLog((prev) => [...prev, msg])
+      });
+      setLegacyDataPending(false);
+      alert("Migración completada. La página se recargará.");
+      window.location.reload();
+    } catch (err) {
+      console.error("Error en la migración:", err);
+      alert(`Error en la migración: ${err.message}`);
+    } finally {
+      setMigrating(false);
+    }
+  };
   const [railExpanded, setRailExpanded] = useState(() => {
     try { return localStorage.getItem("pos-rail-expanded") === "1"; } catch { return false; }
   });
@@ -352,7 +387,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   // Suscribirse a logs de Auditoría
   const logAuditEvent = async (userEmail, action, details) => {
     try {
-      await addDoc(collection(db, "logs"), {
+      await addDoc(rCol("logs"), {
         userEmail,
         action,
         details,
@@ -365,7 +400,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Cargar configuración global
   useEffect(() => {
-    const docRef = doc(db, "config", "settings");
+    const docRef = rDoc("config", "settings");
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -520,7 +555,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a órdenes
   useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const q = query(rCol("orders"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ords = [];
       snapshot.forEach((doc) => {
@@ -537,7 +572,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a productos (Inventario)
   useEffect(() => {
-    const q = query(collection(db, "products"), orderBy("name", "asc"));
+    const q = query(rCol("products"), orderBy("name", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const prods = [];
       snapshot.forEach((doc) => {
@@ -550,7 +585,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a categorías
   useEffect(() => {
-    const q = query(collection(db, "categories"), orderBy("name", "asc"));
+    const q = query(rCol("categories"), orderBy("name", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const cats = [];
       snapshot.forEach((doc) => {
@@ -563,7 +598,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a logs de auditoría
   useEffect(() => {
-    const q = query(collection(db, "logs"), orderBy("timestamp", "desc"));
+    const q = query(rCol("logs"), orderBy("timestamp", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const logs = [];
       snapshot.forEach((doc) => {
@@ -576,7 +611,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a personal (Usuarios)
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
+    const unsubscribe = onSnapshot(query(collection(db, "users"), where("restaurantId", "==", getRestaurantId())), (snapshot) => {
       const uList = [];
       snapshot.forEach((doc) => {
         uList.push({ uid: doc.id, ...doc.data() });
@@ -588,7 +623,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a mesas
   useEffect(() => {
-    const q = query(collection(db, "tables"), orderBy("name", "asc"));
+    const q = query(rCol("tables"), orderBy("name", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = [];
       snapshot.forEach((doc) => {
@@ -603,7 +638,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a turnos de caja
   useEffect(() => {
-    const q = query(collection(db, "shifts"), orderBy("openTime", "desc"));
+    const q = query(rCol("shifts"), orderBy("openTime", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const sList = [];
       snapshot.forEach((doc) => {
@@ -618,7 +653,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a egresos (gastos financieros)
   useEffect(() => {
-    const q = query(collection(db, "expenses"), orderBy("date", "desc"));
+    const q = query(rCol("expenses"), orderBy("date", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const exps = [];
       snapshot.forEach((doc) => {
@@ -633,7 +668,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a eventos
   useEffect(() => {
-    const q = query(collection(db, "events"), orderBy("date", "asc"));
+    const q = query(rCol("events"), orderBy("date", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const evs = [];
       snapshot.forEach((doc) => {
@@ -648,7 +683,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   // Suscribirse a pre-registros
   useEffect(() => {
-    const q = query(collection(db, "event_registrations"), orderBy("registeredAt", "desc"));
+    const q = query(rCol("event_registrations"), orderBy("registeredAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const regs = [];
       snapshot.forEach((doc) => {
@@ -713,7 +748,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   // Acciones de Aprobación de Órdenes
   const handleAuthorize = async (order) => {
     try {
-      const orderRef = doc(db, "orders", order.id);
+      const orderRef = rDoc("orders", order.id);
       await updateDoc(orderRef, {
         status: "preparing",
         authorizedBy: user.uid,
@@ -730,7 +765,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleReject = async (order) => {
     if (window.confirm(`¿Seguro que deseas RECHAZAR la orden #${order.orderNumber}?`)) {
       try {
-        const orderRef = doc(db, "orders", order.id);
+        const orderRef = rDoc("orders", order.id);
         await updateDoc(orderRef, {
           status: "rejected",
           rejectedBy: user.uid,
@@ -740,7 +775,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
         // Restaurar stock
         if (order.items) {
           for (const item of order.items) {
-            const prodRef = doc(db, "products", item.id);
+            const prodRef = rDoc("products", item.id);
             await updateDoc(prodRef, {
               stock: increment(item.quantity)
             });
@@ -757,7 +792,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
   const handleMarkCompleted = async (order) => {
     try {
-      const orderRef = doc(db, "orders", order.id);
+      const orderRef = rDoc("orders", order.id);
       await updateDoc(orderRef, {
         status: "completed",
         completedAt: serverTimestamp()
@@ -857,6 +892,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
         email: staffEmail,
         role: staffRole,
         permissions: staffPermissions,
+        restaurantId: getRestaurantId(),
         disabled: false
       });
 
@@ -931,7 +967,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       return;
     }
     try {
-      await addDoc(collection(db, "shifts"), {
+      await addDoc(rCol("shifts"), {
         status: "open",
         openedBy: user.email,
         openTime: new Date(),
@@ -960,7 +996,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     const discrepancy = (actualCashNum + actualElectronicNum) - (expectedCashTotal + expected.electronic);
 
     try {
-      const shiftRef = doc(db, "shifts", activeShift.id);
+      const shiftRef = rDoc("shifts", activeShift.id);
       await updateDoc(shiftRef, {
         status: "closed",
         closeTime: new Date(),
@@ -1144,7 +1180,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     try {
       if (crudProduct) {
         // EDIT
-        await setDoc(doc(db, "products", crudProduct.id), productPayload, { merge: true });
+        await setDoc(rDoc("products", crudProduct.id), productPayload, { merge: true });
         await logAuditEvent(user.email, "EDITAR_PRODUCTO", `Producto editado: ${crudForm.name}`);
       } else {
         // ADD
@@ -1153,7 +1189,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
           alert("ID de producto inválido.");
           return;
         }
-        await setDoc(doc(db, "products", newId), { id: newId, ...productPayload });
+        await setDoc(rDoc("products", newId), { id: newId, ...productPayload });
         await logAuditEvent(user.email, "CREAR_PRODUCTO", `Producto creado: ${crudForm.name} (ID: ${newId})`);
       }
       setIsCrudModalOpen(false);
@@ -1167,7 +1203,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleDeleteProduct = async (prodId) => {
     if (window.confirm("¿Seguro que deseas eliminar este producto permanentemente del catálogo?")) {
       try {
-        await deleteDoc(doc(db, "products", prodId));
+        await deleteDoc(rDoc("products", prodId));
         await logAuditEvent(user.email, "ELIMINAR_PRODUCTO", `Producto eliminado con ID: ${prodId}`);
         alert("Producto eliminado.");
       } catch (err) {
@@ -1198,7 +1234,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
         date: expenseDate,
         createdBy: user.email || "admin@posvcard.com"
       };
-      await addDoc(collection(db, "expenses"), payload);
+      await addDoc(rCol("expenses"), payload);
       await logAuditEvent(user.email, "CREAR_EGRESO", `Egreso registrado: ${expenseForm.description} (${expenseForm.category}) por $${amountNum.toFixed(2)}`);
       
       setExpenseForm({ description: "", category: "Insumos", amount: "", date: "" });
@@ -1215,7 +1251,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleDeleteExpense = async (expenseId, expenseDesc, expenseAmount) => {
     if (window.confirm(`¿Seguro que deseas eliminar el egreso "${expenseDesc}" por $${expenseAmount.toFixed(2)}?`)) {
       try {
-        await deleteDoc(doc(db, "expenses", expenseId));
+        await deleteDoc(rDoc("expenses", expenseId));
         await logAuditEvent(user.email, "ELIMINAR_EGRESO", `Egreso eliminado: ${expenseDesc} por $${expenseAmount.toFixed(2)}`);
         alert("Egreso eliminado exitosamente.");
       } catch (err) {
@@ -1539,7 +1575,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     e.preventDefault();
     if (!settingsForm) return;
     try {
-      const configRef = doc(db, "config", "settings");
+      const configRef = rDoc("config", "settings");
       await updateDoc(configRef, settingsForm);
       await logAuditEvent(user.email, "ACTUALIZAR_CONFIGURACION", "Se actualizaron parámetros globales del negocio");
       alert("Configuración comercial guardada con éxito.");
@@ -1553,7 +1589,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleSaveSeo = async (e) => {
     e.preventDefault();
     try {
-      const configRef = doc(db, "config", "settings");
+      const configRef = rDoc("config", "settings");
       await updateDoc(configRef, { seo: seoForm });
       await logAuditEvent(user.email, "ACTUALIZAR_SEO", "Se actualizaron meta-tags y SEO");
       alert("Optimización SEO guardada con éxito.");
@@ -1567,7 +1603,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleSaveStoreStatus = async (e) => {
     e.preventDefault();
     try {
-      const configRef = doc(db, "config", "settings");
+      const configRef = rDoc("config", "settings");
       await updateDoc(configRef, {
         maintenanceMessage: storeStatusForm.maintenanceMessage,
         "shipping.shippingCostPerKm": parseFloat(storeStatusForm.deliveryCostPerKm || "0"),
@@ -1595,7 +1631,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       return;
     }
     try {
-      const configRef = doc(db, "config", "settings");
+      const configRef = rDoc("config", "settings");
       const key = `discounts.coupons.${marketingForm.couponCode.toUpperCase().trim()}`;
       await updateDoc(configRef, { [key]: discountVal });
       await logAuditEvent(user.email, "CREAR_CUPON", `Cupón: ${marketingForm.couponCode.toUpperCase().trim()} (${discountVal}%)`);
@@ -1609,7 +1645,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleDeleteCoupon = async (code) => {
     if (window.confirm(`¿Seguro que deseas eliminar el cupón ${code}?`)) {
       try {
-        const configRef = doc(db, "config", "settings");
+        const configRef = rDoc("config", "settings");
         // En Firestore, para borrar un campo de un mapa anidado podemos usar FieldValue.delete() o reescribir.
         // Como no queremos añadir imports complejos, actualizamos el mapa local y guardamos
         const newCoupons = { ...businessConfig.discounts.coupons };
@@ -1633,7 +1669,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       return;
     }
     try {
-      const configRef = doc(db, "config", "settings");
+      const configRef = rDoc("config", "settings");
       const list = [...(businessConfig.discounts.autoDiscounts || [])];
       list.push({ minAmount: min, discountPercent: pct });
       list.sort((a, b) => a.minAmount - b.minAmount);
@@ -1649,7 +1685,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleDeleteAutoDiscount = async (idx) => {
     if (window.confirm("¿Seguro que deseas eliminar esta regla de descuento?")) {
       try {
-        const configRef = doc(db, "config", "settings");
+        const configRef = rDoc("config", "settings");
         const list = [...(businessConfig.discounts.autoDiscounts || [])];
         list.splice(idx, 1);
         await updateDoc(configRef, { "discounts.autoDiscounts": list });
@@ -1771,7 +1807,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       return;
     }
     try {
-      await setDoc(doc(db, "categories", catId), {
+      await setDoc(rDoc("categories", catId), {
         id: catId,
         name: categoryForm.name.trim()
       });
@@ -1787,7 +1823,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleDeleteCategory = async (catId) => {
     if (!window.confirm("¿Estás seguro de que deseas eliminar esta categoría? Nota: Los productos existentes bajo esta categoría conservarán su categoría en su base de datos, pero ya no aparecerán en el filtro de esta categoría hasta que la vuelvas a crear o los reasignes.")) return;
     try {
-      await deleteDoc(doc(db, "categories", catId));
+      await deleteDoc(rDoc("categories", catId));
       await logAuditEvent(user.email, "ELIMINAR_CATEGORIA", `Categoría eliminada: ${catId}`);
       alert("Categoría eliminada.");
     } catch (err) {
@@ -1804,7 +1840,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
     }
     const tId = editingTable ? editingTable.id : tableNameForm.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || Date.now().toString();
     try {
-      await setDoc(doc(db, "tables", tId), {
+      await setDoc(rDoc("tables", tId), {
         id: tId,
         name: tableNameForm.trim(),
         capacity: parseInt(tableCapacityForm, 10) || 4,
@@ -1824,7 +1860,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleToggleTableStatus = async (table) => {
     try {
       const nextStatus = table.status === "ocupada" ? "libre" : "ocupada";
-      await updateDoc(doc(db, "tables", table.id), { status: nextStatus });
+      await updateDoc(rDoc("tables", table.id), { status: nextStatus });
       await logAuditEvent(user.email, "CAMBIAR_ESTADO_MESA", `Mesa ${table.name} cambiada a ${nextStatus}`);
     } catch (err) {
       console.error("Error al cambiar estado de mesa:", err);
@@ -1835,7 +1871,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleDeleteTable = async (tId, name) => {
     if (!window.confirm(`¿Estás seguro de que deseas eliminar la mesa "${name}"?`)) return;
     try {
-      await deleteDoc(doc(db, "tables", tId));
+      await deleteDoc(rDoc("tables", tId));
       await logAuditEvent(user.email, "ELIMINAR_MESA", `Mesa eliminada: ${name} (ID: ${tId})`);
       alert("Mesa eliminada.");
     } catch (err) {
@@ -1872,17 +1908,17 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
       if (crudEvent) {
         // Actualizar evento existente
-        await updateDoc(doc(db, "events", crudEvent.id), eventData);
+        await updateDoc(rDoc("events", crudEvent.id), eventData);
         await logAuditEvent(user.email, "ACTUALIZAR_EVENTO", `Evento actualizado: ${eventForm.title}`);
       } else {
         // Crear nuevo evento
-        await addDoc(collection(db, "events"), eventData);
+        await addDoc(rCol("events"), eventData);
         await logAuditEvent(user.email, "CREAR_EVENTO", `Evento creado: ${eventForm.title}`);
       }
 
       // Si el evento tiene código de cupón y porcentaje de descuento, registrar el cupón en la config global
       if (eventForm.couponCode.trim() && discountVal > 0) {
-        const configRef = doc(db, "config", "settings");
+        const configRef = rDoc("config", "settings");
         const key = `discounts.coupons.${eventForm.couponCode.toUpperCase().trim()}`;
         await updateDoc(configRef, { [key]: discountVal });
       }
@@ -1911,7 +1947,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleDeleteEvent = async (id, title) => {
     if (window.confirm(`¿Seguro que deseas eliminar el evento "${title}"?`)) {
       try {
-        await deleteDoc(doc(db, "events", id));
+        await deleteDoc(rDoc("events", id));
         await logAuditEvent(user.email, "ELIMINAR_EVENTO", `Evento eliminado: ${title}`);
         alert("Evento eliminado.");
       } catch (err) {
@@ -1924,7 +1960,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const handleDeleteRegistration = async (id, name) => {
     if (window.confirm(`¿Seguro que deseas eliminar el pre-registro de ${name}?`)) {
       try {
-        await deleteDoc(doc(db, "event_registrations", id));
+        await deleteDoc(rDoc("event_registrations", id));
         alert("Pre-registro eliminado.");
       } catch (err) {
         console.error("Error al eliminar pre-registro:", err);
@@ -2270,6 +2306,28 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
 
       {/* Main Right Pane Content */}
       <main className="flex-1 overflow-y-auto bg-[#161616] p-4 md:p-8 print:p-0">
+
+        {legacyDataPending && (
+          <div className="max-w-6xl mx-auto mb-6 glass-panel rounded-2xl p-4 border border-[#ffd79b]/35 flex flex-col md:flex-row md:items-center justify-between gap-3 print:hidden">
+            <div>
+              <h3 className="text-sm font-bold text-[#ffd79b]">Actualización a varios restaurantes</h3>
+              <p className="text-xs text-white/60 mt-1">
+                Encontramos datos guardados en el formato anterior. Cópialos a tu restaurante para seguir viéndolos. Los originales no se borran.
+              </p>
+              {migrationLog.length > 0 && (
+                <p className="text-[10px] text-white/40 mt-2">{migrationLog[migrationLog.length - 1]}</p>
+              )}
+            </div>
+            <button
+              onClick={handleMigrateLegacy}
+              disabled={migrating}
+              className="shrink-0 flex items-center justify-center gap-2 bg-pizza-red hover:bg-pizza-red/90 disabled:opacity-60 text-white font-bold text-xs px-5 py-3 rounded-xl cursor-pointer"
+            >
+              {migrating && <Loader2 size={14} className="animate-spin" />}
+              {migrating ? "Migrando..." : "Migrar mis datos"}
+            </button>
+          </div>
+        )}
         
         {/* If POS or Kitchen screen is embedded, let it render directly occupying the space */}
         {activeTab === "pos" ? (

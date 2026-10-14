@@ -1,5 +1,6 @@
 import { db, auth } from "../firebase/config";
-import { doc, setDoc, writeBatch, getDocs, collection } from "firebase/firestore";
+import { rCol, rDoc, getRestaurantId } from "../firebase/tenant";
+import { doc, setDoc, writeBatch, getDocs } from "firebase/firestore";
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 
 export const seedDatabase = async () => {
@@ -8,7 +9,7 @@ export const seedDatabase = async () => {
   try {
     // 0. Limpiar colecciones de productos y categorías existentes
     status.push("Limpiando productos anteriores...");
-    const productsSnapshot = await getDocs(collection(db, "products"));
+    const productsSnapshot = await getDocs(rCol("products"));
     if (!productsSnapshot.empty) {
       const prodBatch = writeBatch(db);
       productsSnapshot.forEach((doc) => {
@@ -19,7 +20,7 @@ export const seedDatabase = async () => {
     }
 
     status.push("Limpiando categorías anteriores...");
-    const categoriesSnapshot = await getDocs(collection(db, "categories"));
+    const categoriesSnapshot = await getDocs(rCol("categories"));
     if (!categoriesSnapshot.empty) {
       const catBatch = writeBatch(db);
       categoriesSnapshot.forEach((doc) => {
@@ -30,7 +31,7 @@ export const seedDatabase = async () => {
     }
 
     // 1. Sembrar Configuración del Negocio
-    const configRef = doc(db, "config", "settings");
+    const configRef = rDoc("config", "settings");
     await setDoc(configRef, {
       name: "GloryChef",
       whatsappNumber: "+59177777777",
@@ -80,7 +81,7 @@ export const seedDatabase = async () => {
       { id: "combos", name: "Combos Especiales" }
     ];
     for (const cat of defaultCategories) {
-      await setDoc(doc(db, "categories", cat.id), cat);
+      await setDoc(rDoc("categories", cat.id), cat);
     }
     status.push("Categorías bolivianas sembradas.");
 
@@ -193,7 +194,7 @@ export const seedDatabase = async () => {
 
     const batch = writeBatch(db);
     products.forEach((prod) => {
-      const prodRef = doc(db, "products", prod.id);
+      const prodRef = rDoc("products", prod.id);
       batch.set(prodRef, prod);
     });
     await batch.commit();
@@ -215,7 +216,8 @@ export const seedDatabase = async () => {
         // Crear documento de rol en Firestore
         await setDoc(doc(db, "users", uid), {
           email: acc.email,
-          role: acc.role
+          role: acc.role,
+          restaurantId: getRestaurantId()
         });
         
         status.push(`Usuario creado: ${acc.email} (${acc.role})`);

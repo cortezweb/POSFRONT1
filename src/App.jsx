@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { auth, firebaseError } from "./firebase/config";
 import { onAuthStateChanged } from "firebase/auth";
-import { getUserRole, getUserData } from "./firebase/auth";
+import { getUserData } from "./firebase/auth";
+import { setRestaurantId, resolveRestaurantFromUrl, DEFAULT_RESTAURANT_ID } from "./firebase/tenant";
 import { CartProvider } from "./context/CartContext";
 
 // Vistas
@@ -36,6 +37,8 @@ function App() {
         try {
           const userData = await getUserData(currentUser.uid);
           if (userData) {
+            // El restaurante activo debe fijarse antes de montar el panel
+            setRestaurantId(userData.restaurantId || DEFAULT_RESTAURANT_ID);
             setRole(userData.role);
             setPermissions(userData.permissions || null);
           } else {
@@ -51,6 +54,7 @@ function App() {
         setUser(null);
         setRole(null);
         setPermissions(null);
+        setRestaurantId(resolveRestaurantFromUrl());
       }
       setLoadingAuth(false);
     });

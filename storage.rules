@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Fotos de GloryChef: lectura pública, subida solo para personal logueado
+// Fotos de GloryChef: lectura pública, subida solo para personal logueado (imágenes < 5 MB)
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
+import { rCol, rDoc } from "../firebase/tenant";
 import { useCart } from "../context/CartContext";
-import { db } from "../firebase/config";
-import { collection, getDocs, addDoc, serverTimestamp, query, where, orderBy, limit, onSnapshot, doc, updateDoc, increment } from "firebase/firestore";
+import { getDocs, addDoc, serverTimestamp, query, where, orderBy, limit, onSnapshot, updateDoc, increment } from "firebase/firestore";
 import { formatCurrency, formatWhatsAppMessage, parseComboItem, getProductPriceWithExtras, getOptionPriceAdjustment } from "../utils/formatters";
 import { MapboxSearch } from "../components/MapboxSearch";
 import { 
@@ -83,7 +83,7 @@ export const ClientMenu = () => {
     setTrackResults([]);
     try {
       const qPhone = query(
-        collection(db, "orders"),
+        rCol("orders"),
         where("customerPhone", "==", trackPhoneInput.trim()),
         orderBy("createdAt", "desc"),
         limit(5)
@@ -97,7 +97,7 @@ export const ClientMenu = () => {
       if (results.length === 0) {
         const cleanOrderNum = trackPhoneInput.replace("#", "").trim();
         const qOrder = query(
-          collection(db, "orders"),
+          rCol("orders"),
           where("orderNumber", "==", cleanOrderNum),
           limit(3)
         );
@@ -117,7 +117,7 @@ export const ClientMenu = () => {
       try {
         const cleanOrderNum = trackPhoneInput.replace("#", "").trim();
         const qOrder = query(
-          collection(db, "orders"),
+          rCol("orders"),
           where("orderNumber", "==", cleanOrderNum),
           limit(3)
         );
@@ -142,7 +142,7 @@ export const ClientMenu = () => {
 
   // Suscribirse a eventos activos de Firestore en tiempo real
   useEffect(() => {
-    const q = query(collection(db, "events"), where("active", "==", true), orderBy("date", "asc"));
+    const q = query(rCol("events"), where("active", "==", true), orderBy("date", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const evs = [];
       snapshot.forEach((doc) => {
@@ -176,7 +176,7 @@ export const ClientMenu = () => {
 
     setRegisteringEvent(true);
     try {
-      await addDoc(collection(db, "event_registrations"), {
+      await addDoc(rCol("event_registrations"), {
         eventId: selectedEventForReg.id,
         eventTitle: selectedEventForReg.title,
         name: regForm.name.trim(),
@@ -207,7 +207,7 @@ export const ClientMenu = () => {
 
   // Cargar productos de Firestore en tiempo real
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
+    const unsubscribe = onSnapshot(rCol("products"), (snapshot) => {
       const prods = [];
       snapshot.forEach((doc) => {
         prods.push({ id: doc.id, ...doc.data() });
@@ -221,7 +221,7 @@ export const ClientMenu = () => {
 
   // Cargar categorías de Firestore
   useEffect(() => {
-    const q = query(collection(db, "categories"), orderBy("name", "asc"));
+    const q = query(rCol("categories"), orderBy("name", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const cats = [];
       snapshot.forEach((doc) => {
@@ -235,7 +235,7 @@ export const ClientMenu = () => {
 
   // Cargar mesas de Firestore en tiempo real
   useEffect(() => {
-    const q = query(collection(db, "tables"), orderBy("name", "asc"));
+    const q = query(rCol("tables"), orderBy("name", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = [];
       snapshot.forEach((doc) => {
@@ -416,13 +416,13 @@ export const ClientMenu = () => {
       };
 
       // Guardar en Firestore
-      const docRef = await addDoc(collection(db, "orders"), orderData);
+      const docRef = await addDoc(rCol("orders"), orderData);
 
       // Descontar stock de Firestore de forma atómica
       try {
         for (const item of cart) {
           if (item.id) {
-            const productRef = doc(db, "products", item.id);
+            const productRef = rDoc("products", item.id);
             await updateDoc(productRef, {
               stock: increment(-item.quantity)
             });

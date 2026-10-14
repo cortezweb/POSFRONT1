@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { db } from "../firebase/config";
-import { doc, onSnapshot, getDoc } from "firebase/firestore";
+import { rDoc } from "../firebase/tenant";
+import { onSnapshot, getDoc } from "firebase/firestore";
 import { calculateDistance } from "../utils/mapboxService";
 import { formatCurrency } from "../utils/formatters";
 import { 
@@ -29,7 +29,7 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const configDoc = await getDoc(doc(db, "config", "settings"));
+        const configDoc = await getDoc(rDoc("config", "settings"));
         if (configDoc.exists()) {
           setBusinessConfig(configDoc.data());
         }
@@ -48,7 +48,7 @@ export const OrderTrackingView = ({ orderId, onBack }) => {
       return;
     }
 
-    const docRef = doc(db, "orders", orderId);
+    const docRef = rDoc("orders", orderId);
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const orderData = { id: docSnap.id, ...docSnap.data() };

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { rCol, rDoc } from "../firebase/tenant";
 import { useCart } from "../context/CartContext";
-import { db } from "../firebase/config";
-import { collection, getDocs, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, orderBy } from "firebase/firestore";
+import { getDocs, addDoc, serverTimestamp, query, where, onSnapshot, updateDoc, increment, orderBy } from "firebase/firestore";
 import { formatCurrency, parseComboItem, getProductPriceWithExtras, getOptionPriceAdjustment } from "../utils/formatters";
 import { MapboxSearch } from "../components/MapboxSearch";
 import { 
@@ -36,7 +36,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
 
   // Obtener mesas en tiempo real
   useEffect(() => {
-    const q = query(collection(db, "tables"), orderBy("name", "asc"));
+    const q = query(rCol("tables"), orderBy("name", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = [];
       snapshot.forEach((doc) => {
@@ -107,7 +107,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
 
   useEffect(() => {
     const q = query(
-      collection(db, "orders"),
+      rCol("orders"),
       where("status", "==", "pending_approval")
     );
 
@@ -142,7 +142,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
 
   const handleApproveOrder = async (orderId) => {
     try {
-      const orderRef = doc(db, "orders", orderId);
+      const orderRef = rDoc("orders", orderId);
       await updateDoc(orderRef, {
         status: "preparing",
         approvedAt: serverTimestamp(),
@@ -166,7 +166,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const handleRejectOrder = async (orderId) => {
     if (!window.confirm("¿Estás seguro de que deseas rechazar este pedido?")) return;
     try {
-      const orderRef = doc(db, "orders", orderId);
+      const orderRef = rDoc("orders", orderId);
       const orderToReject = pendingOrders.find(o => o.id === orderId);
       await updateDoc(orderRef, {
         status: "rejected",
@@ -177,7 +177,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
       // Restaurar stock
       if (orderToReject && orderToReject.items) {
         for (const item of orderToReject.items) {
-          const prodRef = doc(db, "products", item.id);
+          const prodRef = rDoc("products", item.id);
           await updateDoc(prodRef, {
             stock: increment(item.quantity)
           });
@@ -193,7 +193,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "products"));
+        const querySnapshot = await getDocs(rCol("products"));
         const prods = [];
         querySnapshot.forEach((doc) => {
           prods.push({ id: doc.id, ...doc.data() });
@@ -208,7 +208,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
 
   // Cargar categorías de Firestore
   useEffect(() => {
-    const q = query(collection(db, "categories"), orderBy("name", "asc"));
+    const q = query(rCol("categories"), orderBy("name", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const cats = [];
       snapshot.forEach((doc) => {
@@ -350,11 +350,11 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
         createdAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, "orders"), orderData);
+      await addDoc(rCol("orders"), orderData);
 
       // Descontar stock
       for (const item of cart) {
-        const prodRef = doc(db, "products", item.id);
+        const prodRef = rDoc("products", item.id);
         await updateDoc(prodRef, {
           stock: increment(-item.quantity)
         });

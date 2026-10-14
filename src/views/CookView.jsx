@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { db } from "../firebase/config";
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, orderBy } from "firebase/firestore";
+import { rCol, rDoc } from "../firebase/tenant";
+import { query, where, onSnapshot, updateDoc, serverTimestamp, orderBy } from "firebase/firestore";
 import { logoutUser } from "../firebase/auth";
 import { LogOut, ClipboardList, Check, Loader2, Clock, Volume2, VolumeX, Play } from "lucide-react";
 
@@ -68,7 +68,7 @@ export const CookView = ({ user, onLogout, isEmbedded = false }) => {
   // Escuchar órdenes en estado 'preparing' en tiempo real, de la más antigua a la más reciente (FIFO)
   useEffect(() => {
     const q = query(
-      collection(db, "orders"),
+      rCol("orders"),
       where("status", "==", "preparing"),
       orderBy("createdAt", "asc") // Las más viejas primero
     );
@@ -105,7 +105,7 @@ export const CookView = ({ user, onLogout, isEmbedded = false }) => {
 
   const handleMarkReady = async (orderId) => {
     try {
-      const orderRef = doc(db, "orders", orderId);
+      const orderRef = rDoc("orders", orderId);
       await updateDoc(orderRef, {
         status: "ready",
         preparedAt: serverTimestamp()

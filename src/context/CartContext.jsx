@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase/config";
+import { rDoc, useRestaurantId } from "../firebase/tenant";
+import { onSnapshot } from "firebase/firestore";
 import { getProductPriceWithExtras } from "../utils/formatters";
 
 const CartContext = createContext();
@@ -47,9 +47,11 @@ export const CartProvider = ({ children }) => {
     serviceModes: { delivery: true, pickup: true, dineIn: true, tableNumbers: 15, tableLabel: "Mesa" }
   });
 
-  // Suscribirse a los cambios de configuración
+  const restaurantId = useRestaurantId();
+
+  // Suscribirse a los cambios de configuración (del restaurante activo)
   useEffect(() => {
-    const docRef = doc(db, "config", "settings");
+    const docRef = rDoc("config", "settings");
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -70,7 +72,7 @@ export const CartProvider = ({ children }) => {
       console.warn("No se pudo cargar la configuración de Firestore. Usando defaults locales.", error);
     });
     return () => unsubscribe();
-  }, []);
+  }, [restaurantId]);
 
   const addToCart = (product, quantity = 1, optionsSelected = {}, comboItems = []) => {
     // Generar un ID único en el carrito para diferenciar el mismo producto con personalizaciones distintas

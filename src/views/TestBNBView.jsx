@@ -1,16 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { db } from "../firebase/config";
-import { 
-  collection, 
-  addDoc, 
-  serverTimestamp, 
-  query, 
-  orderBy, 
-  limit, 
-  onSnapshot, 
-  doc, 
-  updateDoc 
-} from "firebase/firestore";
+import { rCol, rDoc } from "../firebase/tenant";
+import { addDoc, serverTimestamp, query, orderBy, limit, onSnapshot, updateDoc } from "firebase/firestore";
 import { 
   QrCode, 
   RefreshCw, 
@@ -77,7 +67,7 @@ export function TestBNBView() {
   // Escuchar órdenes recientes desde Firestore
   useEffect(() => {
     addLog("Conectando con Firestore para escuchar órdenes recientes...", "info");
-    const ordersRef = collection(db, "orders");
+    const ordersRef = rCol("orders");
     const q = query(ordersRef, orderBy("createdAt", "desc"), limit(6));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -205,7 +195,7 @@ export function TestBNBView() {
         createdAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, "orders"), mockOrderData);
+      const docRef = await addDoc(rCol("orders"), mockOrderData);
       setAssociatedOrderId(docRef.id);
       setAssociatedOrderNumber(orderNumber);
       
@@ -250,7 +240,7 @@ export function TestBNBView() {
       if (associatedOrderId) {
         addLog(`Actualizando estado del pedido #${associatedOrderNumber} en Firestore...`, "info");
         try {
-          const orderDocRef = doc(db, "orders", associatedOrderId);
+          const orderDocRef = rDoc("orders", associatedOrderId);
           await updateDoc(orderDocRef, {
             status: "preparing", // Pasa a cocina automáticamente por estar pagado
             paymentConfirmed: true,
@@ -276,7 +266,7 @@ export function TestBNBView() {
     
     if (associatedOrderId) {
       try {
-        const orderDocRef = doc(db, "orders", associatedOrderId);
+        const orderDocRef = rDoc("orders", associatedOrderId);
         await updateDoc(orderDocRef, {
           status: "rejected",
           paymentError: `Transacción QR ${actionType}`
