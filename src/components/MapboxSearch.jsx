@@ -5,7 +5,7 @@ import { Search, MapPin, Loader2, Info, Locate } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-export const MapboxSearch = ({ onAddressSelected }) => {
+export const MapboxSearch = ({ onAddressSelected, compact = false }) => {
   const { 
     customerAddress, 
     setCustomerAddress, 
@@ -498,7 +498,7 @@ export const MapboxSearch = ({ onAddressSelected }) => {
         <div className="space-y-1">
           <div 
             ref={mapContainerRef} 
-            className="w-full h-56 rounded-2xl border border-white/10 relative overflow-hidden bg-black/40"
+            className={`w-full ${compact ? "h-36" : "h-56"} rounded-2xl border border-white/10 relative overflow-hidden bg-black/40`}
             style={{ minHeight: "220px" }}
           />
           <div className="flex items-center gap-1.5 text-[10px] text-white/40 px-1">
