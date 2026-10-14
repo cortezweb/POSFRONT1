@@ -143,7 +143,7 @@ export const RecibosTab = ({ businessConfig, canVoid, user, logAuditEvent }) => 
       s.status === "void" ? "Anulada" : "Válida"
     ]));
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob(["FEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `recibos-${period}.csv`;
