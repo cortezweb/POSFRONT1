@@ -129,6 +129,25 @@ export const ConfiguracionTab = ({
         </div>
       </div>
 
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          ["kdsWarnMinutes", "Cocina: aviso (min)", 10],
+          ["kdsLateMinutes", "Cocina: demorado (min)", 20],
+          ["suggestedTipPercent", "Propina sugerida (%)", 10]
+        ].map(([key, label, def]) => (
+          <div key={key}>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">{label}</label>
+            <input
+              type="number"
+              min="0"
+              value={settingsForm[key] ?? def}
+              onChange={(e) => setSettingsForm(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+              className="w-full bg-[#181818] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+            />
+          </div>
+        ))}
+      </div>
+
       <div>
         <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">QR de Yape / Plin (Método de Pago)</label>
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
