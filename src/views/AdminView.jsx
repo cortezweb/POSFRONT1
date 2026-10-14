@@ -24,7 +24,7 @@ import { CookView } from "./CookView";
 import { 
   Check, X, Printer, Settings, LogOut, Loader2, ClipboardList, MessageSquare, 
   MapPin, Users, DollarSign, Package, ShieldAlert, Globe, Percent, BarChart3, 
-  Download, Plus, Trash2, Edit2, Menu, Lock, FileText, Search, Store, Sun, Moon,
+  Download, Plus, Trash2, Edit2, Menu, Lock, FileText, Search, Store, Sun, Moon, ChevronsLeft,
   TrendingUp, Tag, Table, ChefHat, Info, Calendar, Image
 } from "lucide-react";
 
@@ -38,6 +38,15 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   const [activeTab, setActiveTab] = useState("pedidos");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [railExpanded, setRailExpanded] = useState(() => {
+    try { return localStorage.getItem("pos-rail-expanded") === "1"; } catch { return false; }
+  });
+  const toggleRail = () => {
+    setRailExpanded((v) => {
+      try { localStorage.setItem("pos-rail-expanded", v ? "0" : "1"); } catch { /* ignorar */ }
+      return !v;
+    });
+  };
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -2045,64 +2054,88 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   return (
     <div data-theme={theme} className="admin-shell min-h-screen bg-pizza-dark text-white flex print:bg-white print:text-black">
 
-      {/* Barra de iconos (escritorio) */}
-      <aside className="hidden md:flex w-[68px] shrink-0 sticky top-0 h-screen z-40 flex-col items-center justify-between py-4 bg-pizza-red shadow-lg shadow-black/20 print:hidden">
-        <div className="flex flex-col items-center gap-5 min-h-0 w-full">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            title={businessConfig.name || "Sabor Boliviano"}
-            className="w-11 h-11 rounded-xl bg-white flex items-center justify-center overflow-hidden shadow-md cursor-pointer shrink-0"
-          >
-            {businessConfig.logoUrl ? (
-              <img 
-                src={businessConfig.logoUrl} 
-                alt="Logo" 
-                className="w-full h-full object-cover" 
-                onError={(e) => { e.target.style.display = 'none'; }} 
-              />
-            ) : (
-              <span className="text-2xl">🌶️</span>
+      {/* Barra lateral (escritorio): compacta con iconos o expandida con nombres */}
+      <aside className={`hidden md:flex ${railExpanded ? "w-60" : "w-[68px]"} shrink-0 sticky top-0 h-screen z-40 flex-col justify-between py-4 bg-pizza-red shadow-lg shadow-black/20 transition-[width] duration-200 overflow-hidden print:hidden`}>
+        <div className="flex flex-col gap-4 min-h-0 w-full">
+          <div className={`flex items-center gap-3 px-3 ${railExpanded ? "" : "justify-center"}`}>
+            <div className="w-11 h-11 rounded-xl bg-white flex items-center justify-center overflow-hidden shadow-md shrink-0">
+              {businessConfig.logoUrl ? (
+                <img 
+                  src={businessConfig.logoUrl} 
+                  alt="Logo" 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => { e.target.style.display = 'none'; }} 
+                />
+              ) : (
+                <span className="text-2xl">🌶️</span>
+              )}
+            </div>
+            {railExpanded && (
+              <div className="min-w-0">
+                <h2 className="font-pizza-title font-bold text-sm text-white leading-tight truncate">
+                  {businessConfig.name || "Sabor Boliviano"}
+                </h2>
+                <span className="text-[10px] text-white/80 block truncate">
+                  {role === "admin" ? "Panel Administrador" : role === "cashier" ? "Panel Cajero" : "Panel Cocina"}
+                </span>
+              </div>
             )}
-          </button>
+          </div>
 
-          <nav className="flex flex-col items-center gap-1.5 overflow-y-auto w-full px-2 [scrollbar-width:none]">
+          <div className="px-3">
+            <button
+              onClick={toggleRail}
+              title={railExpanded ? "Ocultar nombres" : "Mostrar nombres"}
+              aria-label={railExpanded ? "Contraer menú" : "Expandir menú"}
+              aria-expanded={railExpanded}
+              className={`h-10 w-full flex items-center gap-3 rounded-xl bg-white/15 text-white hover:bg-white/25 transition-all cursor-pointer ${railExpanded ? "px-3" : "justify-center"}`}
+            >
+              {railExpanded ? <ChevronsLeft size={20} strokeWidth={1.75} /> : <Menu size={20} strokeWidth={1.75} />}
+              {railExpanded && <span className="text-xs font-semibold">Ocultar menú</span>}
+            </button>
+          </div>
+
+          <nav className="flex flex-col gap-1.5 overflow-y-auto w-full px-3 [scrollbar-width:none]">
             {tabsList.map((t) => {
               const Icon = t.icon;
               return (
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
-                  title={t.label}
+                  title={railExpanded ? undefined : t.label}
                   aria-label={t.label}
-                  className={`w-11 h-11 shrink-0 flex items-center justify-center rounded-xl transition-all cursor-pointer ${
+                  className={`h-11 shrink-0 flex items-center gap-3 rounded-xl transition-all cursor-pointer ${railExpanded ? "w-full px-3" : "w-11 mx-auto justify-center"} ${
                     activeTab === t.id
-                      ? "bg-white/25 text-white shadow-inner"
-                      : "text-white/80 hover:bg-white/15 hover:text-white"
+                      ? "bg-white/25 text-white shadow-inner font-bold"
+                      : "text-white/80 hover:bg-white/15 hover:text-white font-semibold"
                   }`}
                 >
-                  <Icon size={20} strokeWidth={1.75} />
+                  <Icon size={20} strokeWidth={1.75} className="shrink-0" />
+                  {railExpanded && <span className="text-xs tracking-wide truncate">{t.label}</span>}
                 </button>
               );
             })}
           </nav>
         </div>
 
-        <div className="flex flex-col items-center gap-1.5 pt-3">
+        <div className="flex flex-col gap-1.5 pt-3 px-3">
           <button
             onClick={toggleTheme}
             title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
             aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            className="w-11 h-11 flex items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition-all cursor-pointer"
+            className={`h-11 flex items-center gap-3 rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition-all cursor-pointer ${railExpanded ? "w-full px-3" : "w-11 mx-auto justify-center"}`}
           >
-            {theme === "dark" ? <Sun size={20} strokeWidth={1.75} /> : <Moon size={20} strokeWidth={1.75} />}
+            {theme === "dark" ? <Sun size={20} strokeWidth={1.75} className="shrink-0" /> : <Moon size={20} strokeWidth={1.75} className="shrink-0" />}
+            {railExpanded && <span className="text-xs font-semibold">{theme === "dark" ? "Modo Claro" : "Modo Oscuro"}</span>}
           </button>
           <button
             onClick={handleLogoutClick}
             title="Cerrar Sesión"
             aria-label="Cerrar Sesión"
-            className="w-11 h-11 flex items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition-all cursor-pointer"
+            className={`h-11 flex items-center gap-3 rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition-all cursor-pointer ${railExpanded ? "w-full px-3" : "w-11 mx-auto justify-center"}`}
           >
-            <LogOut size={20} strokeWidth={1.75} />
+            <LogOut size={20} strokeWidth={1.75} className="shrink-0" />
+            {railExpanded && <span className="text-xs font-semibold">Cerrar Sesión</span>}
           </button>
         </div>
       </aside>
@@ -2115,7 +2148,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
           <button
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Abrir menú"
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+            className="md:hidden p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
           >
             <Menu size={20} />
           </button>
