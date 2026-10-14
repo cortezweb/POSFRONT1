@@ -2043,7 +2043,71 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
   }, [tabsList, activeTab]);
 
   return (
-    <div data-theme={theme} className="admin-shell min-h-screen bg-pizza-dark text-white flex flex-col print:bg-white print:text-black">
+    <div data-theme={theme} className="admin-shell min-h-screen bg-pizza-dark text-white flex print:bg-white print:text-black">
+
+      {/* Barra de iconos (escritorio) */}
+      <aside className="hidden md:flex w-[68px] shrink-0 sticky top-0 h-screen z-40 flex-col items-center justify-between py-4 bg-pizza-red shadow-lg shadow-black/20 print:hidden">
+        <div className="flex flex-col items-center gap-5 min-h-0 w-full">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            title={businessConfig.name || "Sabor Boliviano"}
+            className="w-11 h-11 rounded-xl bg-white flex items-center justify-center overflow-hidden shadow-md cursor-pointer shrink-0"
+          >
+            {businessConfig.logoUrl ? (
+              <img 
+                src={businessConfig.logoUrl} 
+                alt="Logo" 
+                className="w-full h-full object-cover" 
+                onError={(e) => { e.target.style.display = 'none'; }} 
+              />
+            ) : (
+              <span className="text-2xl">🌶️</span>
+            )}
+          </button>
+
+          <nav className="flex flex-col items-center gap-1.5 overflow-y-auto w-full px-2 [scrollbar-width:none]">
+            {tabsList.map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  title={t.label}
+                  aria-label={t.label}
+                  className={`w-11 h-11 shrink-0 flex items-center justify-center rounded-xl transition-all cursor-pointer ${
+                    activeTab === t.id
+                      ? "bg-white/25 text-white shadow-inner"
+                      : "text-white/80 hover:bg-white/15 hover:text-white"
+                  }`}
+                >
+                  <Icon size={20} strokeWidth={1.75} />
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex flex-col items-center gap-1.5 pt-3">
+          <button
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+            aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            className="w-11 h-11 flex items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition-all cursor-pointer"
+          >
+            {theme === "dark" ? <Sun size={20} strokeWidth={1.75} /> : <Moon size={20} strokeWidth={1.75} />}
+          </button>
+          <button
+            onClick={handleLogoutClick}
+            title="Cerrar Sesión"
+            aria-label="Cerrar Sesión"
+            className="w-11 h-11 flex items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition-all cursor-pointer"
+          >
+            <LogOut size={20} strokeWidth={1.75} />
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex-1 min-w-0 flex flex-col">
       
       {/* Top Header con menú hamburguesa */}
       <header className="bg-pizza-dark/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 md:px-6 flex justify-between items-center z-40 shrink-0 sticky top-0 print:hidden">
@@ -2059,11 +2123,11 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
             <img 
               src={businessConfig.logoUrl} 
               alt="Logo" 
-              className="w-7 h-7 rounded-full object-cover border border-white/10" 
+              className="md:hidden w-7 h-7 rounded-full object-cover border border-white/10" 
               onError={(e) => { e.target.style.display = 'none'; }} 
             />
           ) : (
-            <span className="text-2xl">🌶️</span>
+            <span className="md:hidden text-2xl">🌶️</span>
           )}
           <span className="font-pizza-title font-bold text-sm truncate">
             {businessConfig.name || "Sabor Boliviano"}
@@ -5404,6 +5468,7 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
           </div>
         )}
       </main>
+      </div>
 
       {/* MODAL DE CRUD PRODUCTOS (INVENTARIO) */}
       {isCrudModalOpen && (

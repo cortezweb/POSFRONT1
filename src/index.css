@@ -208,6 +208,7 @@ html, body {
 /* Botones con fondo de color: el texto blanco se mantiene blanco */
 .admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-pizza-gold, .bg-emerald-500, .bg-emerald-600, .bg-red-500, .bg-red-600, .bg-blue-500, .bg-blue-600, .bg-green-500, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-black, .bg-black\/85, .bg-black\/80, .bg-black\/75).text-white,
 .admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-pizza-gold, .bg-emerald-500, .bg-emerald-600, .bg-red-500, .bg-red-600, .bg-blue-500, .bg-blue-600, .bg-green-500, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-black) :is(.text-white, .text-white\/80, .text-white\/70, .text-white\/60, .text-white\/50) { color: #ffffff; }
+.admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-emerald-500, .bg-emerald-600) .hover\:text-white:hover { color: #ffffff; }
 .admin-shell[data-theme="light"] .bg-\[\#ffd79b\] { background-color: #fbbf24; }
 
 /* Bordes */
