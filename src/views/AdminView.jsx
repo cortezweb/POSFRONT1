@@ -762,7 +762,9 @@ export const AdminView = ({ user, role, permissions, onLogout }) => {
       await updateDoc(orderRef, {
         status: "preparing",
         authorizedBy: user.uid,
-        authorizedAt: serverTimestamp()
+        authorizedAt: serverTimestamp(),
+        // Pedido web en mesa: queda en la cuenta abierta de la mesa hasta cobrar
+        ...(order.serviceMode === "dinein" && !order.paymentStatus ? { paymentStatus: "pending" } : {})
       });
       await logAuditEvent(user.email, "AUTORIZAR_ORDEN", `Orden #${order.orderNumber} autorizada para cocina`);
       triggerPrint(order);

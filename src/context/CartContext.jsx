@@ -76,9 +76,10 @@ export const CartProvider = ({ children }) => {
     return () => unsubscribe();
   }, [restaurantId]);
 
-  const addToCart = (product, quantity = 1, optionsSelected = {}, comboItems = []) => {
+  const addToCart = (product, quantity = 1, optionsSelected = {}, comboItems = [], note = "") => {
     // Generar un ID único en el carrito para diferenciar el mismo producto con personalizaciones distintas
-    const cartId = `${product.id}-${JSON.stringify(optionsSelected)}-${JSON.stringify(comboItems)}`;
+    const cleanNote = (note || "").trim();
+    const cartId = `${product.id}-${JSON.stringify(optionsSelected)}-${JSON.stringify(comboItems)}${cleanNote ? `-${cleanNote}` : ""}`;
 
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.cartId === cartId);
@@ -107,7 +108,8 @@ export const CartProvider = ({ children }) => {
             quantity,
             category: product.category,
             optionsSelected,
-            comboItems
+            comboItems,
+            ...(cleanNote ? { note: cleanNote } : {})
           }
         ];
       }

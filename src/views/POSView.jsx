@@ -5,10 +5,12 @@ import { getDocs, addDoc, serverTimestamp, query, where, onSnapshot, updateDoc, 
 import { formatCurrency, parseComboItem, getProductPriceWithExtras, getOptionPriceAdjustment } from "../utils/formatters";
 import { MapboxSearch } from "../components/MapboxSearch";
 import { 
-  ShoppingBag, Plus, Minus, X, ChevronRight, LogOut, Menu, Search, Volume2, VolumeX, Bell, CheckCircle, XCircle, Printer
+  ShoppingBag, Plus, Minus, X, ChevronRight, LogOut, Menu, Search, Volume2, VolumeX, Bell, CheckCircle, XCircle, Printer,
+  ChefHat, Receipt, Wallet, Utensils, StickyNote, Clock
 } from "lucide-react";
 import { logoutUser } from "../firebase/auth";
 import { TicketTemplate } from "../components/TicketTemplate";
+import { KitchenTicket, PreBillTicket } from "../components/KitchenTicket";
 
 export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false }) => {
   const {
@@ -33,6 +35,38 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const [activeMobileTab, setActiveMobileTab] = useState("menu");
   const [posSearch, setPosSearch] = useState("");
   const [tablesList, setTablesList] = useState([]);
+  const [itemNote, setItemNote] = useState("");
+  const [orderNote, setOrderNote] = useState("");
+  const [lastSentOrder, setLastSentOrder] = useState(null);
+
+  // Cuentas abiertas (pedidos en mesa aún sin cobrar)
+  const [openOrders, setOpenOrders] = useState([]);
+  const [isAccountsOpen, setIsAccountsOpen] = useState(false);
+  const [payingBill, setPayingBill] = useState(null);
+  const [payMethod, setPayMethod] = useState("cash");
+  const [cashReceived, setCashReceived] = useState("");
+  const [isPaying, setIsPaying] = useState(false);
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    if (!isAccountsOpen) return;
+    const tick = () => setNowSec(Math.floor(Date.now() / 1000));
+    const interval = setInterval(tick, 30000);
+    return () => clearInterval(interval);
+  }, [isAccountsOpen]);
+
+  useEffect(() => {
+    const q = query(rCol("orders"), where("paymentStatus", "==", "pending"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((d) => {
+        const data = { id: d.id, ...d.data() };
+        if (data.status !== "rejected" && data.status !== "cancelled") list.push(data);
+      });
+      setOpenOrders(list);
+    }, (error) => console.error("Error al cargar cuentas abiertas:", error));
+    return () => unsubscribe();
+  }, []);
 
   // Obtener mesas en tiempo real
   useEffect(() => {
@@ -55,16 +89,17 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const isInitialPos = useRef(true);
   const isAlertMutedRef = useRef(isAlertMuted);
 
-  // Estados para ticket de impresión
-  const [selectedOrderForPrint, setSelectedOrderForPrint] = useState(null);
+  // Documento a imprimir: { type: "receipt" | "comanda" | "precuenta", data }
+  const [printJob, setPrintJob] = useState(null);
   const [printSize, setPrintSize] = useState("80mm");
 
-  const triggerPrint = (order) => {
-    setSelectedOrderForPrint(order);
+  const printDocument = (type, data) => {
+    setPrintJob({ type, data });
     setTimeout(() => {
       window.print();
     }, 250);
   };
+  const triggerPrint = (order) => printDocument("receipt", order);
 
   useEffect(() => {
     isAlertMutedRef.current = isAlertMuted;
@@ -143,10 +178,13 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   const handleApproveOrder = async (orderId) => {
     try {
       const orderRef = rDoc("orders", orderId);
+      const toApprove = pendingOrders.find(o => o.id === orderId);
       await updateDoc(orderRef, {
         status: "preparing",
         approvedAt: serverTimestamp(),
-        approvedBy: user.uid
+        approvedBy: user.uid,
+        // Pedido web en mesa: queda en la cuenta abierta de la mesa hasta cobrar
+        ...(toApprove?.serviceMode === "dinein" && !toApprove?.paymentStatus ? { paymentStatus: "pending" } : {})
       });
       // Imprimir ticket automáticamente al aprobar
       const approvedOrder = pendingOrders.find(o => o.id === orderId);
@@ -245,6 +283,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
     }
     setSelectedProduct(product);
     setQuantity(1);
+    setItemNote("");
     
     const initialOpts = {};
     if (product.options) {
@@ -296,7 +335,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
       alert(`Lo sentimos, el stock disponible es de ${selectedProduct.stock} unidades. Ya tienes ${currentQtyInCart} en tu carrito.`);
       return;
     }
-    addToCart(selectedProduct, quantity, optionsSelected, comboItemsSelected);
+    addToCart(selectedProduct, quantity, optionsSelected, comboItemsSelected, itemNote);
     setSelectedProduct(null);
   };
 
@@ -306,40 +345,51 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
   };
 
   const handleSaveOrder = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (cart.length === 0) return;
 
-    if (!customerName || !customerPhone) {
-      alert("Ingresa el Nombre y Teléfono del cliente.");
-      return;
-    }
-
-    if (serviceMode === "delivery" && (!customerAddress || !customerCoords)) {
-      alert("Por favor selecciona una dirección de delivery válida de la lista de sugerencias o usa el GPS.");
-      return;
-    }
-
     if (serviceMode === "dinein" && !tableNumber) {
-      alert("Selecciona la mesa asignada.");
+      alert("Selecciona la mesa.");
       return;
+    }
+    if (serviceMode === "pickup" && !customerName) {
+      alert("Ingresa el nombre del cliente para el pedido para llevar.");
+      return;
+    }
+    if (serviceMode === "delivery") {
+      if (!customerName || !customerPhone) {
+        alert("Ingresa el nombre y teléfono del cliente para el delivery.");
+        return;
+      }
+      if (!customerAddress || !customerCoords) {
+        alert("Por favor selecciona una dirección de delivery válida de la lista de sugerencias o usa el GPS.");
+        return;
+      }
     }
 
     setLoading(true);
     try {
       const totals = getTotals();
       const orderNumber = Math.floor(1000 + Math.random() * 9000).toString();
+      const isDineIn = serviceMode === "dinein";
 
+      // El personal envía directo a cocina. En mesa la cuenta queda abierta hasta cobrar;
+      // para llevar y delivery se cobra al registrar.
       const orderData = {
         orderNumber,
-        status: "pending_approval",
+        status: "preparing",
         createdBy: user.uid,
-        customerName,
-        customerPhone,
+        waiterName: user.email?.split("@")[0] || "",
+        customerName: customerName || (isDineIn ? `Mesa ${tableNumber}` : ""),
+        customerPhone: customerPhone || "",
         customerAddress: serviceMode === "delivery" ? customerAddress : "",
         customerCoords: serviceMode === "delivery" ? customerCoords : null,
         serviceMode,
-        tableNumber: serviceMode === "dinein" ? tableNumber : "",
-        paymentMethod,
+        tableNumber: isDineIn ? tableNumber : "",
+        paymentMethod: isDineIn ? "" : paymentMethod,
+        paymentStatus: isDineIn ? "pending" : "paid",
+        ...(isDineIn ? {} : { paidAt: serverTimestamp() }),
+        orderNote: orderNote.trim(),
         items: cart,
         distanceKm: serviceMode === "delivery" ? shippingDistance : 0,
         shippingCost: serviceMode === "delivery" ? shippingCost : 0,
@@ -347,7 +397,10 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
         discountAmount: totals.totalDiscount,
         taxAmount: totals.taxAmount,
         total: totals.total,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        approvedAt: serverTimestamp(),
+        approvedBy: user.uid,
+        sentToKitchenAt: serverTimestamp()
       };
 
       await addDoc(rCol("orders"), orderData);
@@ -360,28 +413,130 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
         });
       }
 
-      // Imprimir ticket automáticamente al registrar en POS
-      const orderForPrint = {
-        ...orderData,
-        createdAt: { seconds: Math.floor(Date.now() / 1000) } // usar timestamp local para impresión instantánea
-      };
-      triggerPrint(orderForPrint);
+      // Marcar la mesa como ocupada
+      if (isDineIn) {
+        const table = tablesList.find((t) => t.name === tableNumber);
+        if (table && table.status !== "ocupada") {
+          updateDoc(rDoc("tables", table.id), { status: "ocupada" }).catch(() => {});
+        }
+      }
 
-      setSuccessMsg(`¡Orden #${orderNumber} enviada a autorización!`);
+      // Imprimir la comanda para cocina
+      const localOrder = {
+        ...orderData,
+        createdAt: { seconds: Math.floor(Date.now() / 1000) }
+      };
+      printDocument("comanda", localOrder);
+      setLastSentOrder(localOrder);
+
+      setSuccessMsg(`¡Orden #${orderNumber} enviada a cocina!`);
       clearCart();
-      
-      // Limpiar campos locales
+
       setCustomerName("");
       setCustomerPhone("");
       setCustomerAddress("");
-      setTableNumber("");
+      setOrderNote("");
+      if (!isDineIn) setTableNumber("");
 
-      setTimeout(() => setSuccessMsg(""), 4000);
+      setTimeout(() => setSuccessMsg(""), 6000);
     } catch (err) {
       console.error("Error al registrar orden en POS:", err);
       alert("Error al registrar la orden.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ---------- Cuentas abiertas por mesa ----------
+  const openBills = Object.values(
+    openOrders
+      .filter((o) => o.serviceMode === "dinein")
+      .reduce((acc, o) => {
+        const key = o.tableNumber || "Sin mesa";
+        if (!acc[key]) acc[key] = { tableNumber: key, orders: [], subtotal: 0, discount: 0, total: 0, openedAt: Infinity };
+        acc[key].orders.push(o);
+        acc[key].subtotal += Number(o.subtotal || 0);
+        acc[key].discount += Number(o.discountAmount || 0);
+        acc[key].total += Number(o.total || 0);
+        acc[key].openedAt = Math.min(acc[key].openedAt, o.createdAt?.seconds || Infinity);
+        return acc;
+      }, {})
+  )
+    .map((b) => {
+      // Agrupar platos iguales de todas las rondas
+      const itemsMap = {};
+      b.orders.forEach((o) => (o.items || []).forEach((it) => {
+        const key = `${it.name}|${it.price}`;
+        if (!itemsMap[key]) itemsMap[key] = { name: it.name, price: Number(it.price || 0), quantity: 0 };
+        itemsMap[key].quantity += it.quantity;
+      }));
+      return {
+        ...b,
+        items: Object.values(itemsMap),
+        orderNumbers: b.orders.map((o) => o.orderNumber),
+        inKitchen: b.orders.filter((o) => o.status === "preparing").length
+      };
+    })
+    .sort((a, b) => a.openedAt - b.openedAt);
+
+  const handlePrintPreBill = (bill) => printDocument("precuenta", bill);
+
+  const handleAddRound = (bill) => {
+    setServiceMode("dinein");
+    setTableNumber(bill.tableNumber);
+    setIsAccountsOpen(false);
+    setActiveMobileTab("menu");
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!payingBill) return;
+    const received = Number(cashReceived || 0);
+    if (payMethod === "cash" && cashReceived !== "" && received < payingBill.total) {
+      alert("El monto recibido es menor al total.");
+      return;
+    }
+    setIsPaying(true);
+    try {
+      await Promise.all(payingBill.orders.map((o) =>
+        updateDoc(rDoc("orders", o.id), {
+          paymentStatus: "paid",
+          paymentMethod: payMethod,
+          paidAt: serverTimestamp(),
+          paidBy: user.uid,
+          // Lo ya servido se cierra; lo que sigue en cocina se cerrará al entregarse
+          ...(o.status === "ready" ? { status: "completed", completedAt: serverTimestamp() } : {})
+        })
+      ));
+
+      const table = tablesList.find((t) => t.name === payingBill.tableNumber);
+      if (table) updateDoc(rDoc("tables", table.id), { status: "libre" }).catch(() => {});
+
+      // Comprobante final con todos los pedidos de la mesa
+      triggerPrint({
+        orderNumber: payingBill.orderNumbers.join("-"),
+        customerName: `Mesa ${payingBill.tableNumber}`,
+        customerPhone: "",
+        serviceMode: "dinein",
+        tableNumber: payingBill.tableNumber,
+        paymentMethod: payMethod,
+        items: payingBill.orders.flatMap((o) => o.items || []),
+        subtotal: payingBill.subtotal,
+        discountAmount: payingBill.discount,
+        taxAmount: payingBill.orders.reduce((n, o) => n + Number(o.taxAmount || 0), 0),
+        shippingCost: 0,
+        total: payingBill.total,
+        createdAt: { seconds: Math.floor(Date.now() / 1000) }
+      });
+
+      setSuccessMsg(`Mesa ${payingBill.tableNumber} cobrada.`);
+      setPayingBill(null);
+      setCashReceived("");
+      setTimeout(() => setSuccessMsg(""), 5000);
+    } catch (err) {
+      console.error("Error al cobrar la mesa:", err);
+      alert("Error al registrar el cobro.");
+    } finally {
+      setIsPaying(false);
     }
   };
 
@@ -565,6 +720,18 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                 <ShoppingBag size={18} className="text-[#ffd79b]" />
                 Orden Actual
               </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setNowSec(Math.floor(Date.now() / 1000)); setIsAccountsOpen(true); }}
+                  className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
+                    openBills.length > 0 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                  }`}
+                  title="Mesas con cuenta abierta: precuenta y cobro"
+                >
+                  <Receipt size={12} />
+                  Cuentas{openBills.length > 0 ? ` (${openBills.length})` : ""}
+                </button>
               {cart.length > 0 && (
                 <button
                   onClick={clearCart}
@@ -573,11 +740,22 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                   Vaciar
                 </button>
               )}
+              </div>
             </div>
 
             {successMsg && (
               <div className="bg-[#ffd79b]/10 border border-[#ffd79b]/35 text-[#ffd79b] rounded-xl p-4 text-xs font-semibold">
-                {successMsg}
+                <span className="block">{successMsg}</span>
+                {lastSentOrder && (
+                  <div className="flex gap-2 mt-2">
+                    <button type="button" onClick={() => printDocument("comanda", lastSentOrder)} className="flex items-center gap-1 bg-white/10 hover:bg-white/15 text-white rounded-lg px-2.5 py-1.5 text-[10px] font-bold cursor-pointer">
+                      <Printer size={11} /> Comanda
+                    </button>
+                    <button type="button" onClick={() => triggerPrint(lastSentOrder)} className="flex items-center gap-1 bg-white/10 hover:bg-white/15 text-white rounded-lg px-2.5 py-1.5 text-[10px] font-bold cursor-pointer">
+                      <Receipt size={11} /> Ticket cliente
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -607,6 +785,9 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                         <span className="block text-[9px] text-pizza-gold/60 mt-0.5">
                           Combo: {item.comboItems.join(" + ")}
                         </span>
+                      )}
+                      {item.note && (
+                        <span className="block text-[9px] text-amber-400 mt-0.5">📝 {item.note}</span>
                       )}
                     </div>
 
@@ -646,18 +827,18 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
               <div className="grid grid-cols-1 gap-2">
                 <input
                   type="text"
-                  required
+                  
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Nombre del Cliente"
+                  placeholder={serviceMode === "dinein" ? "Nombre del cliente (opcional)" : "Nombre del cliente"}
                   className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-red"
                 />
                 <input
                   type="text"
-                  required
+                  
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="Teléfono"
+                  placeholder={serviceMode === "delivery" ? "Teléfono" : "Teléfono (opcional)"}
                   className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-red"
                 />
               </div>
@@ -726,7 +907,21 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                 </select>
               )}
 
-              {/* Método de pago */}
+              {/* Nota general del pedido */}
+              <input
+                type="text"
+                value={orderNote}
+                onChange={(e) => setOrderNote(e.target.value)}
+                placeholder="Nota general para cocina (opcional)"
+                className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-red"
+              />
+
+              {/* Método de pago (en mesa se cobra al cerrar la cuenta) */}
+              {serviceMode === "dinein" ? (
+                <p className="text-[10px] text-white/40 bg-white/5 rounded-lg p-2.5">
+                  En mesa la cuenta queda abierta. Cóbrala desde <strong className="text-white/70">Cuentas abiertas</strong> cuando el cliente la pida.
+                </p>
+              ) : (
               <div>
                 <span className="block text-[9px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Método de Pago</span>
                 <div className="grid grid-cols-3 gap-2">
@@ -773,6 +968,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                   </div>
                 )}
               </div>
+              )}
             </form>
           </div>
 
@@ -806,7 +1002,8 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
               disabled={loading || cart.length === 0}
               className="w-full bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl py-3.5 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-pizza-red/20 disabled:opacity-40"
             >
-              {loading ? "Registrando..." : "Registrar & Solicitar Autorización"}
+              <ChefHat size={15} />
+              {loading ? "Enviando..." : "Enviar a cocina"}
               <ChevronRight size={14} />
             </button>
           </div>
@@ -951,6 +1148,18 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                   <ShoppingBag size={18} className="text-[#ffd79b]" />
                   Orden Actual
                 </h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setNowSec(Math.floor(Date.now() / 1000)); setIsAccountsOpen(true); }}
+                    className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
+                      openBills.length > 0 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                    }`}
+                    title="Mesas con cuenta abierta: precuenta y cobro"
+                  >
+                    <Receipt size={12} />
+                    Cuentas{openBills.length > 0 ? ` (${openBills.length})` : ""}
+                  </button>
                 {cart.length > 0 && (
                   <button
                     onClick={clearCart}
@@ -959,11 +1168,22 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                     Vaciar
                   </button>
                 )}
+                </div>
               </div>
 
               {successMsg && (
                 <div className="bg-[#ffd79b]/10 border border-[#ffd79b]/35 text-[#ffd79b] rounded-xl p-4 text-xs font-semibold">
-                  {successMsg}
+                  <span className="block">{successMsg}</span>
+                  {lastSentOrder && (
+                    <div className="flex gap-2 mt-2">
+                      <button type="button" onClick={() => printDocument("comanda", lastSentOrder)} className="flex items-center gap-1 bg-white/10 hover:bg-white/15 text-white rounded-lg px-2.5 py-1.5 text-[10px] font-bold cursor-pointer">
+                        <Printer size={11} /> Comanda
+                      </button>
+                      <button type="button" onClick={() => triggerPrint(lastSentOrder)} className="flex items-center gap-1 bg-white/10 hover:bg-white/15 text-white rounded-lg px-2.5 py-1.5 text-[10px] font-bold cursor-pointer">
+                        <Receipt size={11} /> Ticket cliente
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -994,6 +1214,9 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                             <span className="block text-[9px] text-pizza-gold/60 mt-0.5">
                               Combo: {item.comboItems.join(" + ")}
                             </span>
+                          )}
+                          {item.note && (
+                            <span className="block text-[9px] text-amber-400 mt-0.5">📝 {item.note}</span>
                           )}
                         </div>
 
@@ -1032,18 +1255,18 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                     <div className="grid grid-cols-1 gap-2">
                       <input
                         type="text"
-                        required
+                        
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="Nombre del Cliente"
+                        placeholder={serviceMode === "dinein" ? "Nombre del cliente (opcional)" : "Nombre del cliente"}
                         className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-red"
                       />
                       <input
                         type="text"
-                        required
+                        
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
-                        placeholder="Teléfono"
+                        placeholder={serviceMode === "delivery" ? "Teléfono" : "Teléfono (opcional)"}
                         className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-red"
                       />
                     </div>
@@ -1112,7 +1335,21 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                       </select>
                     )}
 
-                    {/* Método de pago */}
+                    {/* Nota general del pedido */}
+                    <input
+                      type="text"
+                      value={orderNote}
+                      onChange={(e) => setOrderNote(e.target.value)}
+                      placeholder="Nota general para cocina (opcional)"
+                      className="w-full bg-[#181818] border border-white/5 rounded-lg p-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-red"
+                    />
+
+                    {/* Método de pago (en mesa se cobra al cerrar la cuenta) */}
+                    {serviceMode === "dinein" ? (
+                      <p className="text-[10px] text-white/40 bg-white/5 rounded-lg p-2.5">
+                        En mesa la cuenta queda abierta. Cóbrala desde <strong className="text-white/70">Cuentas abiertas</strong> cuando el cliente la pida.
+                      </p>
+                    ) : (
                     <div>
                       <span className="block text-[9px] font-bold uppercase tracking-wider text-white/40 mb-1.5">Método de Pago</span>
                       <div className="grid grid-cols-3 gap-2">
@@ -1159,6 +1396,7 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
 
                   {/* Resumen y botón registrar */}
@@ -1191,7 +1429,8 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                       disabled={loading || cart.length === 0}
                       className="w-full bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl py-3.5 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-pizza-red/20 disabled:opacity-40"
                     >
-                      {loading ? "Registrando..." : "Registrar & Solicitar Autorización"}
+                      <ChefHat size={15} />
+              {loading ? "Enviando..." : "Enviar a cocina"}
                       <ChevronRight size={14} />
                     </button>
                   </div>
@@ -1403,6 +1642,32 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
                 </div>
               )}
 
+              {/* Nota para cocina */}
+              <div className="pt-3 border-t border-white/5">
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1.5">
+                  <StickyNote size={12} /> Nota para cocina
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {["Sin cebolla", "Sin picante", "Bien cocido", "Para llevar", "Sin sal"].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setItemNote((prev) => (prev ? `${prev}, ${n}` : n))}
+                      className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-white/70 cursor-pointer"
+                    >
+                      + {n}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={itemNote}
+                  onChange={(e) => setItemNote(e.target.value)}
+                  rows={2}
+                  placeholder="Ej. sin cebolla, salsa aparte..."
+                  className="w-full bg-[#101010] border border-white/5 rounded-xl p-2.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-pizza-red/50 resize-none"
+                />
+              </div>
+
               {/* Selector de Cantidad */}
               <div className="flex items-center justify-between pt-3 border-t border-white/5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Cantidad:</span>
@@ -1602,20 +1867,160 @@ export const POSView = ({ user, role, permissions, onLogout, isEmbedded = false 
         </div>
       )}
 
-      {selectedOrderForPrint && (
-        <TicketTemplate 
-          order={selectedOrderForPrint} 
+      {/* Cuentas abiertas por mesa: precuenta, agregar ronda y cobro */}
+      {isAccountsOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-end" onClick={() => setIsAccountsOpen(false)}>
+          <div className="w-full max-w-md h-full bg-[#121212] border-l border-white/10 flex flex-col text-left" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h3 className="font-pizza-title font-bold text-base flex items-center gap-2">
+                  <Receipt size={18} className="text-pizza-red" /> Cuentas abiertas
+                </h3>
+                <p className="text-[11px] text-white/40">Mesas con pedidos sin cobrar</p>
+              </div>
+              <button onClick={() => setIsAccountsOpen(false)} className="p-2 rounded-xl hover:bg-white/5 text-white/60 hover:text-white cursor-pointer" aria-label="Cerrar">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {openBills.length === 0 ? (
+                <div className="py-16 text-center text-xs text-white/40">
+                  <Utensils size={28} className="mx-auto mb-2 text-white/20" />
+                  No hay mesas con cuenta abierta.
+                </div>
+              ) : openBills.map((bill) => {
+                const minutes = Number.isFinite(bill.openedAt) ? Math.max(0, Math.floor((nowSec - bill.openedAt) / 60)) : 0;
+                return (
+                  <div key={bill.tableNumber} className="bg-[#181818] border border-white/5 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="text-base font-black">Mesa {bill.tableNumber}</h4>
+                        <p className="text-[10px] text-white/40 flex items-center gap-1">
+                          <Clock size={10} /> {minutes} min · {bill.orders.length} pedido(s)
+                          {bill.inKitchen > 0 && <span className="text-amber-400 font-bold"> · {bill.inKitchen} en cocina</span>}
+                        </p>
+                      </div>
+                      <span className="text-lg font-black text-pizza-red">{formatCurrency(bill.total, businessConfig.currency)}</span>
+                    </div>
+                    <div className="text-[11px] text-white/60 space-y-0.5 max-h-24 overflow-y-auto">
+                      {bill.items.map((it, i) => (
+                        <div key={i} className="flex justify-between gap-2">
+                          <span className="truncate">{it.quantity} × {it.name}</span>
+                          <span className="text-white/40 shrink-0">{formatCurrency(it.price * it.quantity, businessConfig.currency)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button onClick={() => handleAddRound(bill)} className="flex flex-col items-center gap-1 bg-white/5 hover:bg-white/10 rounded-xl py-2.5 text-[10px] font-bold cursor-pointer">
+                        <Plus size={14} /> Agregar
+                      </button>
+                      <button onClick={() => handlePrintPreBill(bill)} className="flex flex-col items-center gap-1 bg-white/5 hover:bg-white/10 rounded-xl py-2.5 text-[10px] font-bold cursor-pointer">
+                        <Printer size={14} /> Precuenta
+                      </button>
+                      <button
+                        onClick={() => { setPayingBill(bill); setPayMethod("cash"); setCashReceived(""); }}
+                        className="flex flex-col items-center gap-1 bg-pizza-red hover:bg-pizza-red/90 text-white rounded-xl py-2.5 text-[10px] font-bold cursor-pointer"
+                      >
+                        <Wallet size={14} /> Cobrar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cobro de mesa */}
+      {payingBill && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#181818] border border-white/10 rounded-3xl p-6 space-y-4 text-left shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-pizza-title font-bold text-base">Cobrar Mesa {payingBill.tableNumber}</h3>
+              <button onClick={() => setPayingBill(null)} className="p-1 text-white/60 hover:text-white cursor-pointer" aria-label="Cerrar"><X size={18} /></button>
+            </div>
+            <div className="bg-pizza-dark/60 rounded-2xl p-4 text-center">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-white/40">Total a cobrar</span>
+              <div className="text-3xl font-black text-pizza-red">{formatCurrency(payingBill.total, businessConfig.currency)}</div>
+              {payingBill.inKitchen > 0 && (
+                <p className="text-[10px] text-amber-400 mt-1">{payingBill.inKitchen} pedido(s) siguen en cocina; se cerrarán al entregarse.</p>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[["cash", "💵 Efectivo"], ["yape", "📱 QR"], ["transfer", "💳 Tarjeta/Transf."]].map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setPayMethod(k)}
+                  className={`py-3 rounded-xl text-[10px] font-bold border cursor-pointer ${payMethod === k ? "bg-pizza-red/10 border-pizza-red text-pizza-red" : "bg-[#121212] border-white/5 text-white/70"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {payMethod === "cash" && (
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-white/40">Monto recibido</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.5"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value)}
+                  placeholder={payingBill.total.toFixed(2)}
+                  className="w-full bg-[#121212] border border-white/10 rounded-xl px-4 py-3 text-lg font-bold text-white focus:outline-none focus:border-pizza-red/50"
+                  autoFocus
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {[Math.ceil(payingBill.total), 50, 100, 200].filter((v, i, arr) => v >= payingBill.total && arr.indexOf(v) === i).map((v) => (
+                    <button key={v} type="button" onClick={() => setCashReceived(String(v))} className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-bold cursor-pointer">
+                      {formatCurrency(v, businessConfig.currency)}
+                    </button>
+                  ))}
+                </div>
+                {cashReceived !== "" && Number(cashReceived) >= payingBill.total && (
+                  <div className="flex justify-between text-sm font-bold bg-emerald-500/10 text-emerald-400 rounded-xl px-4 py-2.5">
+                    <span>Cambio</span>
+                    <span>{formatCurrency(Number(cashReceived) - payingBill.total, businessConfig.currency)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {payMethod === "yape" && businessConfig.yapeQrUrl && (
+              <div className="flex justify-center">
+                <img src={businessConfig.yapeQrUrl} alt="QR de pago" className="w-36 h-36 bg-white rounded-xl p-2 object-contain" />
+              </div>
+            )}
+            <button
+              onClick={handleConfirmPayment}
+              disabled={isPaying}
+              className="w-full flex items-center justify-center gap-2 bg-pizza-red hover:bg-pizza-red/90 disabled:opacity-60 text-white font-bold text-sm py-3.5 rounded-xl cursor-pointer"
+            >
+              {isPaying ? "Registrando cobro..." : "Confirmar cobro e imprimir"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {printJob?.type === "receipt" && (
+        <TicketTemplate
+          order={printJob.data}
           totals={{
-            subtotal: selectedOrderForPrint.subtotal || 0,
-            totalDiscount: selectedOrderForPrint.discountAmount || 0,
-            taxAmount: selectedOrderForPrint.taxAmount || 0,
-            shippingCost: selectedOrderForPrint.shippingCost || 0,
-            total: selectedOrderForPrint.total || 0
-          }} 
-          config={businessConfig} 
-          printSize={printSize} 
+            subtotal: printJob.data.subtotal || 0,
+            totalDiscount: printJob.data.discountAmount || 0,
+            taxAmount: printJob.data.taxAmount || 0,
+            shippingCost: printJob.data.shippingCost || 0,
+            total: printJob.data.total || 0
+          }}
+          config={businessConfig}
+          printSize={printSize}
         />
       )}
+      {printJob?.type === "comanda" && <KitchenTicket order={printJob.data} printSize={printSize} />}
+      {printJob?.type === "precuenta" && <PreBillTicket bill={printJob.data} config={businessConfig} printSize={printSize} />}
     </div>
   );
 };
