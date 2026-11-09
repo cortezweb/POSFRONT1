@@ -21,6 +21,8 @@ export const ClientMenu = () => {
     businessConfig, getTotals
   } = useCart();
 
+  const cartItemCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+
   const availableCoupons = Object.entries(businessConfig.discounts?.coupons || {});
 
   const [products, setProducts] = useState([]);
@@ -1874,6 +1876,47 @@ export const ClientMenu = () => {
           </button>
         </nav>
       </div>
+
+      {/* Botón flotante de carrito (aparece cuando hay productos) */}
+      {cartItemCount > 0 && (
+        <>
+          {/* Móvil: sobre la barra inferior; abre la pestaña del carrito */}
+          {activeMobileTab !== "cart" && (
+            <button
+              type="button"
+              onClick={() => setActiveMobileTab("cart")}
+              aria-label={`Ver carrito (${cartItemCount} productos)`}
+              className="md:hidden fixed bottom-20 right-4 z-30 flex items-center gap-2 bg-pizza-red hover:bg-pizza-red/90 text-white keep-white font-extrabold text-xs pl-3 pr-4 py-3 rounded-full shadow-xl shadow-pizza-red/30 border-0 cursor-pointer active:scale-95 transition-transform"
+            >
+              <span className="relative flex items-center justify-center">
+                <ShoppingBag size={20} />
+                <span className="absolute -top-2 -right-2.5 bg-white text-pizza-red text-[10px] font-black min-w-5 h-5 px-1 rounded-full flex items-center justify-center shadow">
+                  {cartItemCount}
+                </span>
+              </span>
+              <span className="ml-1">{formatCurrency(totals.total, businessConfig.currency)}</span>
+            </button>
+          )}
+
+          {/* Escritorio: esquina inferior derecha; abre el panel del carrito */}
+          {!cartOpen && (
+            <button
+              type="button"
+              onClick={() => setCartOpen(true)}
+              aria-label={`Ver carrito (${cartItemCount} productos)`}
+              className="hidden md:flex fixed bottom-6 right-6 z-30 items-center gap-3 bg-pizza-red hover:bg-pizza-red/90 text-white keep-white font-extrabold text-sm pl-4 pr-5 py-3.5 rounded-full shadow-2xl shadow-pizza-red/30 border-0 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+            >
+              <span className="relative flex items-center justify-center">
+                <ShoppingBag size={22} />
+                <span className="absolute -top-2 -right-2.5 bg-white text-pizza-red text-[10px] font-black min-w-5 h-5 px-1 rounded-full flex items-center justify-center shadow">
+                  {cartItemCount}
+                </span>
+              </span>
+              <span className="ml-1">Ver pedido · {formatCurrency(totals.total, businessConfig.currency)}</span>
+            </button>
+          )}
+        </>
+      )}
 
       {/* Info Drawer (Modal Lateral de Contacto en Mobile) */}
       {infoDrawerOpen && (
