@@ -161,7 +161,8 @@ html, body {
 .admin-shell[data-theme="light"] .bg-\[\#181818\],
 .admin-shell[data-theme="light"] .bg-\[\#1a1a1a\],
 .admin-shell[data-theme="light"] .bg-\[\#1c1c1c\],
-.admin-shell[data-theme="light"] .bg-\[\#202020\] { background-color: var(--light-surface); }
+.admin-shell[data-theme="light"] .bg-\[\#202020\],
+.admin-shell[data-theme="light"] .bg-\[\#1e1e1e\] { background-color: var(--light-surface); }
 .admin-shell[data-theme="light"] .bg-\[\#181818\]\/60,
 .admin-shell[data-theme="light"] .bg-\[\#181818\]\/40,
 .admin-shell[data-theme="light"] .bg-\[\#1a1a1a\]\/40 { background-color: rgba(255, 255, 255, 0.7); }
@@ -206,8 +207,8 @@ html, body {
 .admin-shell[data-theme="light"] .placeholder-white\/20::placeholder { color: rgba(26, 28, 28, 0.35); }
 
 /* Botones con fondo de color: el texto blanco se mantiene blanco */
-.admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-pizza-gold, .bg-emerald-500, .bg-emerald-600, .bg-red-500, .bg-red-600, .bg-blue-500, .bg-blue-600, .bg-green-500, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-black, .bg-black\/85, .bg-black\/80, .bg-black\/75).text-white,
-.admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-pizza-gold, .bg-emerald-500, .bg-emerald-600, .bg-red-500, .bg-red-600, .bg-blue-500, .bg-blue-600, .bg-green-500, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-black) :is(.text-white, .text-white\/80, .text-white\/70, .text-white\/60, .text-white\/50) { color: #ffffff; }
+.admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-pizza-gold, .bg-emerald-500, .bg-emerald-600, .bg-red-500, .bg-red-600, .bg-blue-500, .bg-blue-600, .bg-green-500, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-neutral-800, .bg-black, .bg-black\/85, .bg-black\/80, .bg-black\/75).text-white,
+.admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-pizza-gold, .bg-emerald-500, .bg-emerald-600, .bg-red-500, .bg-red-600, .bg-blue-500, .bg-blue-600, .bg-green-500, .bg-green-600, .bg-amber-500, .bg-orange-500, .bg-neutral-800, .bg-black) :is(.text-white, .text-white\/80, .text-white\/70, .text-white\/60, .text-white\/50) { color: #ffffff; }
 .admin-shell[data-theme="light"] :is(.bg-pizza-red, .bg-emerald-500, .bg-emerald-600) .hover\:text-white:hover { color: #ffffff; }
 .admin-shell[data-theme="light"] .bg-\[\#ffd79b\] { background-color: #fbbf24; }
 
@@ -222,6 +223,23 @@ html, body {
 .admin-shell[data-theme="light"] .border-white\/40,
 .admin-shell[data-theme="light"] .hover\:border-white\/25:hover { border-color: rgba(0, 0, 0, 0.25); }
 .admin-shell[data-theme="light"] .border-\[\#141414\] { border-color: #ffffff; }
+
+/* Campos de formulario: fondo claro, texto y placeholder legibles
+   (aunque el componente use un fondo oscuro fijo) */
+.admin-shell[data-theme="light"] :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), textarea, select):is([class*="bg-[#1"], [class*="bg-pizza-dark"], [class*="bg-black"], [class*="bg-neutral-"], [class*="bg-white/"]) {
+  background-color: #ffffff;
+  color: var(--light-text);
+  border-color: rgba(0, 0, 0, 0.14);
+}
+.admin-shell[data-theme="light"] :is(input, textarea, select):is([class*="bg-[#1"], [class*="bg-pizza-dark"], [class*="bg-black"], [class*="bg-neutral-"], [class*="bg-white/"]):focus {
+  border-color: var(--color-pizza-red);
+}
+.admin-shell[data-theme="light"] :is(input, textarea)::placeholder { color: rgba(26, 28, 28, 0.42); }
+.admin-shell[data-theme="light"] select option { background-color: #ffffff; color: var(--light-text); }
+.admin-shell[data-theme="light"] :is(input, textarea, select):-webkit-autofill {
+  -webkit-text-fill-color: var(--light-text);
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+}
 
 /* Barra de desplazamiento */
 .admin-shell[data-theme="light"] ::-webkit-scrollbar-track { background: var(--light-bg); }
